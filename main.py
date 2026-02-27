@@ -1,483 +1,144 @@
 import os
 import sys
-import subprocess
-import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox, filedialog
-import pytchat
-import threading
-import multiprocessing
 import time
 import queue
-from datetime import datetime, timedelta
-import re
+import threading
+import subprocess
+import shutil
+import tkinter as tk
+from datetime import datetime
 
-# Audio playback
+import pytchat
 from playsound3 import playsound
 
-# ---------------- Configuration Defaults ----------------
-DEFAULT_VOICE = "th-TH-PremwadeeNeural"
-TEMP_DIR = "tts_cache"
-LOG_DIR = "logs"
-PROFANITY_DEFAULT = ["fuck", "shit", "ควย", "สัส", "เหี้ย"]
-SPAM_WINDOW_SECONDS = 10
-SPAM_REPEAT_THRESHOLD = 3
+# ================= CONFIG =================
+YOUTUBE_VIDEO_ID = "4r6R0GL5c7U"   # ใส่ Video ID หรือ URL ไลฟ์
+VOICE = "th-TH-PremwadeeNeural"
 
-# ---------------- Helpers ----------------
-def safe_mkdir(p):
+CACHE_DIR = "tts_cache"
+DELAY_PER_CHAR = 0.06
+MAX_DELAY = 30
+CLEAR_EVERY = 10
+# ==========================================
+
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+tts_queue = queue.Queue()
+played_count = 0
+running = True
+
+
+def log(msg):
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+
+
+# ---------- GUI (ว่าง ๆ สำหรับ OBS) ----------
+def start_gui():
+    root = tk.Tk()
+    root.title("TTS Audio Bridge")
+    root.geometry("320x120")
+    root.resizable(False, False)
+
+    label = tk.Label(
+        root,
+        text="🎧 TTS Audio Running\nใช้หน้าต่างนี้จับเสียงเข้า OBS",
+        font=("Segoe UI", 10)
+    )
+    label.pack(expand=True)
+
+    # ปิด GUI = ปิดโปรแกรมทั้งหมด
+    def on_close():
+        global running
+        running = False
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_close)
+    root.mainloop()
+
+
+# ---------- TTS WORKER ----------
+def tts_worker():
+    global played_count
+
+    while running:
+        try:
+            text = tts_queue.get(timeout=1)
+        except queue.Empty:
+            continue
+
+        if text is None:
+            break
+
+        filename = os.path.join(
+            CACHE_DIR, f"tts_{int(time.time() * 1000)}.mp3"
+        )
+
+        cmd = [
+            sys.executable, "-m", "edge_tts",
+            "--voice", VOICE,
+            "--text", text,
+            "--write-media", filename
+        ]
+
+        try:
+            subprocess.run(cmd, capture_output=True, check=True)
+            playsound(filename)
+
+            played_count += 1
+            if played_count % CLEAR_EVERY == 0:
+                clear_cache()
+
+            delay = min(MAX_DELAY, len(text) * DELAY_PER_CHAR)
+            time.sleep(delay)
+
+        except Exception as e:
+            log(f"❌ TTS ERROR: {e}")
+
+        tts_queue.task_done()
+
+
+def clear_cache():
     try:
-        os.makedirs(p, exist_ok=True)
+        shutil.rmtree(CACHE_DIR)
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        log("🧹 ล้าง tts_cache แล้ว")
     except Exception:
         pass
 
-safe_mkdir(TEMP_DIR)
-safe_mkdir(LOG_DIR)
 
-# ---------------- Main App ----------------
-class YouTubeTTS:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("YouTube Chat TTS — Advanced (playsound3 non-blocking)")
-        self.root.geometry("900x700")
-        self.root.configure(bg="#121212")
+# ---------- MAIN (pytchat ต้องอยู่ main thread) ----------
+def main():
+    global running
+    log("🎤 TTS CMD RUNNING (Ctrl+C เพื่อหยุด)")
 
-        self.running = False
-        self.chat_process = None
-        self.manager = multiprocessing.Manager()
-        self.ipc_queue = self.manager.Queue()
-        self.tts_task_queue = queue.Queue()
-        self.audio_worker_thread = None
-        self.tts_worker_stop = threading.Event()
+    # เริ่ม worker
+    worker = threading.Thread(target=tts_worker, daemon=True)
+    worker.start()
 
-        self.voice = DEFAULT_VOICE
-        self.available_voices = []
-        self.load_voices()
+    # เริ่ม GUI (thread แยก)
+    gui_thread = threading.Thread(target=start_gui, daemon=True)
+    gui_thread.start()
 
-        self.delay_per_char = tk.DoubleVar(value=1.0)
-        self.min_delay = tk.IntVar(value=1)
-        self.max_delay = tk.IntVar(value=15)
+    # pytchat ต้องอยู่ main thread
+    chat = pytchat.create(video_id=YOUTUBE_VIDEO_ID)
 
-        self.spam_window = tk.IntVar(value=SPAM_WINDOW_SECONDS)
-        self.spam_threshold = tk.IntVar(value=SPAM_REPEAT_THRESHOLD)
-        self.profanity_list = set(PROFANITY_DEFAULT)
+    try:
+        while running and chat.is_alive():
+            for c in chat.get().sync_items():
+                msg = f"{c.author.name} พูดว่า {c.message}"
+                log(f"💬 {msg}")
+                tts_queue.put(msg)
 
-        self.recent_messages = {}
-        self.voice_var = tk.StringVar(value=self.voice)
-        self.log_buffer = []
+            time.sleep(1)
 
-        self.setup_ui()
+    except KeyboardInterrupt:
+        log("⛔ หยุดระบบ")
 
-        threading.Thread(target=self.ipc_poster_thread, daemon=True).start()
+    finally:
+        running = False
+        tts_queue.put(None)
+        worker.join()
 
-    # ---------------- UI ----------------
-    def setup_ui(self):
-        header = tk.Label(self.root, text="🎧 YouTube Chat TTS — Advanced", font=("Segoe UI", 18, "bold"),
-                          bg="#121212", fg="#00ffb3")
-        header.pack(pady=8)
 
-        top_frame = ttk.Frame(self.root)
-        top_frame.pack(fill="x", padx=10, pady=6)
-
-        ttk.Label(top_frame, text="YouTube Live URL:").grid(row=0, column=0, padx=4, pady=4, sticky="w")
-        self.url_entry = ttk.Entry(top_frame, width=55)
-        self.url_entry.grid(row=0, column=1, padx=4, pady=4, sticky="w")
-
-        self.start_btn = ttk.Button(top_frame, text="Start", command=self.start_system)
-        self.start_btn.grid(row=0, column=2, padx=4)
-        self.stop_btn = ttk.Button(top_frame, text="Stop", command=self.stop_system, state="disabled")
-        self.stop_btn.grid(row=0, column=3, padx=4)
-        ttk.Button(top_frame, text="Export Log", command=self.export_log).grid(row=0, column=4, padx=4)
-
-        voice_frame = ttk.Frame(self.root)
-        voice_frame.pack(fill="x", padx=10, pady=4)
-        ttk.Label(voice_frame, text="Voice:").grid(row=0, column=0, padx=4, sticky="w")
-        self.voice_cb = ttk.Combobox(voice_frame, textvariable=self.voice_var, values=self.available_voices, width=50)
-        self.voice_cb.grid(row=0, column=1, padx=4, sticky="w")
-        ttk.Button(voice_frame, text="Refresh Voices", command=self.reload_voices).grid(row=0, column=2, padx=4)
-
-        settings_frame = ttk.LabelFrame(self.root, text="Delay / Queue Settings")
-        settings_frame.pack(fill="x", padx=10, pady=6)
-
-        ttk.Label(settings_frame, text="Delay per char (s):").grid(row=0, column=0, padx=6, pady=4, sticky="w")
-        ttk.Entry(settings_frame, textvariable=self.delay_per_char, width=8).grid(row=0, column=1, padx=6, pady=4, sticky="w")
-
-        ttk.Label(settings_frame, text="Min delay (s):").grid(row=0, column=2, padx=6, pady=4, sticky="w")
-        ttk.Entry(settings_frame, textvariable=self.min_delay, width=6).grid(row=0, column=3, padx=6, pady=4, sticky="w")
-
-        ttk.Label(settings_frame, text="Max delay (s):").grid(row=0, column=4, padx=6, pady=4, sticky="w")
-        ttk.Entry(settings_frame, textvariable=self.max_delay, width=6).grid(row=0, column=5, padx=6, pady=4, sticky="w")
-
-        filter_frame = ttk.LabelFrame(self.root, text="Spam & Profanity Filter")
-        filter_frame.pack(fill="x", padx=10, pady=6)
-
-        ttk.Label(filter_frame, text="Spam window (s):").grid(row=0, column=0, padx=6, pady=4, sticky="w")
-        ttk.Entry(filter_frame, textvariable=self.spam_window, width=6).grid(row=0, column=1, padx=6, pady=4, sticky="w")
-
-        ttk.Label(filter_frame, text="Repeat threshold:").grid(row=0, column=2, padx=6, pady=4, sticky="w")
-        ttk.Entry(filter_frame, textvariable=self.spam_threshold, width=6).grid(row=0, column=3, padx=6, pady=4, sticky="w")
-
-        ttk.Label(filter_frame, text="Add profanity / blacklist:").grid(row=1, column=0, padx=6, pady=4, sticky="w")
-        self.black_entry = ttk.Entry(filter_frame, width=30)
-        self.black_entry.grid(row=1, column=1, padx=6, pady=4, sticky="w")
-        ttk.Button(filter_frame, text="Add", command=self.add_profanity).grid(row=1, column=2, padx=6)
-        ttk.Button(filter_frame, text="Show List", command=self.show_profanity_list).grid(row=1, column=3, padx=6)
-
-        self.log_box = scrolledtext.ScrolledText(self.root, width=110, height=24, bg="#1b1b1b", fg="#e6e6e6",
-                                                 font=("Consolas", 10))
-        self.log_box.pack(padx=10, pady=8)
-
-        bottom_frame = ttk.Frame(self.root)
-        bottom_frame.pack(fill="x", padx=10, pady=6)
-        ttk.Button(bottom_frame, text="Clear Temp", command=self.clear_temp).grid(row=0, column=0, padx=6)
-        ttk.Button(bottom_frame, text="Clear Log", command=self.clear_log).grid(row=0, column=1, padx=6)
-
-        self.status_var = tk.StringVar(value="Ready")
-        ttk.Label(bottom_frame, textvariable=self.status_var).grid(row=0, column=2, padx=10, sticky="w")
-
-        self.voice_cb.bind("<<ComboboxSelected>>", lambda e: self.set_voice(self.voice_var.get()))
-        self.set_voice(self.voice_var.get())
-
-    # ---------------- Logging ----------------
-    def log(self, msg):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"[{timestamp}] {msg}"
-        self.log_buffer.append(line)
-        try:
-            self.log_box.insert(tk.END, line + "\n")
-            self.log_box.see(tk.END)
-        except:
-            pass
-
-    def export_log(self):
-        if not self.log_buffer:
-            messagebox.showinfo("Export Log", "ไม่มี log ให้ส่งออก")
-            return
-        filename = filedialog.asksaveasfilename(defaultextension=".txt", initialdir=LOG_DIR,
-                                                filetypes=[("Text files","*.txt"),("All files","*.*")])
-        if not filename:
-            return
-        try:
-            with open(filename, "w", encoding="utf-8") as f:
-                f.write("\n".join(self.log_buffer))
-            messagebox.showinfo("Export Log", f"บันทึก log ที่: {filename}")
-        except Exception as e:
-            messagebox.showerror("Export Log", f"บันทึกไม่สำเร็จ: {e}")
-
-    def clear_log(self):
-        self.log_buffer = []
-        try:
-            self.log_box.delete("1.0", tk.END)
-        except:
-            pass
-
-    # ---------------- Voice handling ----------------
-    def load_voices(self):
-        voices = []
-        try:
-            cmd = [sys.executable, "-m", "edge_tts", "--list-voices"]
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            out = proc.stdout + "\n" + proc.stderr
-            ids = re.findall(r"[a-z]{2}-[A-Z]{2}-[A-Za-z0-9]+Neural", out)
-            seen = set()
-            for v in ids:
-                if v not in seen:
-                    seen.add(v)
-                    voices.append(v)
-        except:
-            pass
-
-        if not voices:
-            voices = [DEFAULT_VOICE, "en-US-AriaNeural", "en-US-GuyNeural"]
-
-        self.available_voices = voices
-        try:
-            self.voice_var.set(voices[0])
-        except:
-            pass
-
-    def reload_voices(self):
-        self.log("[INFO] กำลังโหลดรายชื่อเสียงจาก edge-tts...")
-        self.load_voices()
-        try:
-            self.voice_cb.config(values=self.available_voices)
-            self.voice_var.set(self.available_voices[0])
-            self.set_voice(self.available_voices[0])
-            self.log(f"[INFO] โหลดเสียงสำเร็จ: {len(self.available_voices)} เสียง")
-        except Exception as e:
-            self.log(f"[ERROR] โหลดเสียงไม่สำเร็จ: {e}")
-
-    def set_voice(self, voice_id):
-        voice_id = voice_id.strip()
-        self.voice = voice_id
-        self.log(f"[INFO] ตั้งค่าเสียงเป็น: {voice_id}")
-
-    # ---------------- Profanity / Spam ----------------
-    def add_profanity(self):
-        txt = self.black_entry.get().strip()
-        if not txt:
-            return
-        parts = re.split(r"[,;\s]+", txt)
-        added = 0
-        for p in parts:
-            if p and p.lower() not in self.profanity_list:
-                self.profanity_list.add(p.lower())
-                added += 1
-        self.black_entry.delete(0, tk.END)
-        self.log(f"[FILTER] เพิ่มคำใน blacklist: {added} รายการ")
-
-    def show_profanity_list(self):
-        if not self.profanity_list:
-            messagebox.showinfo("Profanity List", "ไม่มีคำในรายการ")
-            return
-        sorted_list = sorted(self.profanity_list)
-        messagebox.showinfo("Profanity List", "\n".join(sorted_list))
-
-    def check_profanity(self, text):
-        txt = text.lower()
-        for w in self.profanity_list:
-            if w and w in txt:
-                return True, w
-        return False, None
-
-    def check_spam(self, author, message):
-        key = (author, message)
-        now = datetime.now()
-        window = timedelta(seconds=self.spam_window.get())
-        if key not in self.recent_messages:
-            self.recent_messages[key] = []
-        self.recent_messages[key] = [ts for ts in self.recent_messages[key] if now - ts <= window]
-        self.recent_messages[key].append(now)
-        count = len(self.recent_messages[key])
-        if count >= max(1, self.spam_threshold.get()):
-            return True, count
-        return False, count
-
-    # ---------------- IPC Poster ----------------
-    def ipc_poster_thread(self):
-        while True:
-            try:
-                item = self.ipc_queue.get(timeout=1)
-            except queue.Empty:
-                time.sleep(0.1)
-                continue
-
-            if isinstance(item, str) and item.startswith("[ERROR_CHAT]"):
-                self.log(f"[ERROR_CHAT] {item.replace('[ERROR_CHAT]','').strip()}")
-                continue
-
-            if not isinstance(item, dict):
-                self.log(f"[WARN] unknown ipc item: {item}")
-                continue
-
-            author = item.get("author", "Unknown")
-            message = item.get("message", "")
-
-            prof, word = self.check_profanity(message)
-            if prof:
-                self.log(f"[FILTER] พบคำต้องห้าม ('{word}') จาก {author} -> บล็อก")
-                continue
-
-            is_spam, count = self.check_spam(author, message)
-            if is_spam:
-                self.log(f"[FILTER] บล็อก spam: ข้อความซ้ำจาก {author} ({count} ครั้ง)")
-                continue
-
-            tts_text = f"{author} พูดว่า: {message}"
-            self.log(f"[QUEUE] เพิ่มงาน TTS ของ {author}: \"{message[:60]}{'...' if len(message)>60 else ''}\"")
-            self.tts_task_queue.put({"author": author, "message": message, "tts_text": tts_text})
-
-    # ---------------- Start / Stop ----------------
-    def start_system(self):
-        if self.running:
-            messagebox.showinfo("Already running", "ระบบกำลังทำงานอยู่")
-            return
-        url = self.url_entry.get().strip()
-        if not url:
-            messagebox.showwarning("Missing URL", "กรุณาใส่ลิงก์ YouTube Live")
-            return
-
-        if self.voice_var.get():
-            self.set_voice(self.voice_var.get())
-
-        self.running = True
-        self.status_var.set("Starting...")
-        self.log("[INFO] เริ่มระบบ...")
-
-        self.chat_process = multiprocessing.Process(target=self.chat_reader_process, args=(url, self.ipc_queue))
-        self.chat_process.start()
-
-        self.tts_worker_stop.clear()
-        self.audio_worker_thread = threading.Thread(target=self.tts_worker, daemon=True)
-        self.audio_worker_thread.start()
-
-        self.start_btn.config(state="disabled")
-        self.stop_btn.config(state="normal")
-        self.status_var.set("Running")
-
-    def stop_system(self):
-        if not self.running:
-            return
-        self.running = False
-        self.status_var.set("Stopping...")
-        self.log("[INFO] กำลังหยุดระบบ...")
-
-        try:
-            if self.chat_process and self.chat_process.is_alive():
-                self.chat_process.terminate()
-                self.chat_process.join(timeout=3)
-        except:
-            pass
-        self.chat_process = None
-
-        self.tts_worker_stop.set()
-
-        try:
-            while not self.tts_task_queue.empty():
-                self.tts_task_queue.get_nowait()
-        except:
-            pass
-
-        self.start_btn.config(state="normal")
-        self.stop_btn.config(state="disabled")
-        self.status_var.set("Stopped")
-        self.log("[INFO] ระบบหยุดเรียบร้อย")
-
-    # ---------------- Chat Reader ----------------
-    @staticmethod
-    def chat_reader_process(url, ipc_queue):
-        try:
-            def extract_video_id(u):
-                m = re.search(r"v=([a-zA-Z0-9_-]{11})", u)
-                if m: return m.group(1)
-                m = re.search(r"youtu\.be/([a-zA-Z0-9_-]{11})", u)
-                if m: return m.group(1)
-                return u
-
-            video_id = extract_video_id(url)
-            chat = pytchat.create(video_id=video_id)
-            while chat.is_alive():
-                try:
-                    for c in chat.get().sync_items():
-                        ipc_queue.put({"author": c.author.name, "message": c.message})
-                    time.sleep(0.4)
-                except Exception as e:
-                    ipc_queue.put(f"[ERROR_CHAT] {e}")
-                    time.sleep(1.5)
-        except Exception as e:
-            ipc_queue.put(f"[ERROR_CHAT] {e}")
-
-    # ---------------- TTS Worker ----------------
-    def tts_worker(self):
-        self.log("[TTS_WORKER] เริ่มทำงาน (playsound3 non-blocking)")
-        while not self.tts_worker_stop.is_set():
-            try:
-                task = self.tts_task_queue.get(timeout=0.6)
-            except queue.Empty:
-                continue
-
-            tts_text = task.get("tts_text") or f"{task.get('author')} พูดว่า: {task.get('message')}"
-
-            try:
-                per_char = float(self.delay_per_char.get())
-            except:
-                per_char = 1.0
-
-            raw_delay = len(tts_text) * per_char
-            delay = int(max(self.min_delay.get(), min(self.max_delay.get(), raw_delay)))
-
-            filename = os.path.join(TEMP_DIR, f"tts_{int(time.time()*1000)}.mp3")
-
-            try:
-                cmd = [
-                    sys.executable, "-m", "edge_tts",
-                    "--voice", self.voice,
-                    "--text", tts_text,
-                    "--write-media", filename
-                ]
-                self.log(f"[TTS] Generating: {os.path.basename(filename)} ({len(tts_text)} chars)")
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=12)
-
-                if proc.returncode != 0:
-                    err = (proc.stderr or proc.stdout or "unknown error").strip()
-                    self.log(f"[ERROR] edge-tts failed: {err}")
-                    continue
-
-                if not os.path.exists(filename) or os.path.getsize(filename) < 800:
-                    self.log("[ERROR] ไฟล์เสียงเสียหรือเล็กเกินไป")
-                    continue
-
-                # Non-blocking playback
-                self.log(f"[PLAY] เริ่มเล่น (non-blocking): {os.path.basename(filename)}")
-                sound = playsound(str(filename), block=False)
-
-                start = time.time()
-                max_play_duration = 45.0  # safety timeout
-
-                while sound.is_alive():
-                    if self.tts_worker_stop.is_set():
-                        sound.stop()
-                        self.log("[PLAY] หยุดเสียงกลางคัน (stop requested)")
-                        break
-
-                    if time.time() - start > max_play_duration:
-                        sound.stop()
-                        self.log("[PLAY] Timeout playback → บังคับหยุด")
-                        break
-
-                    time.sleep(0.08)
-
-                self.log(f"[PLAY] เล่นจบหรือข้าม: {os.path.basename(filename)}")
-
-                # Post-play delay
-                waited = 0.0
-                while waited < delay and not self.tts_worker_stop.is_set():
-                    time.sleep(0.25)
-                    waited += 0.25
-
-                self.cleanup_old_tts_files()
-
-            except subprocess.TimeoutExpired:
-                self.log("[TTS] edge-tts timeout")
-                try:
-                    if os.path.exists(filename):
-                        os.remove(filename)
-                except:
-                    pass
-            except Exception as e:
-                self.log(f"[ERROR] TTS worker: {type(e).__name__} - {e}")
-                time.sleep(1.2)
-
-        self.log("[TTS_WORKER] หยุดทำงาน")
-
-    def cleanup_old_tts_files(self, max_keep=40):
-        try:
-            files = [os.path.join(TEMP_DIR, f) for f in os.listdir(TEMP_DIR) if f.endswith(".mp3")]
-            files.sort(key=os.path.getmtime, reverse=True)
-            for old in files[max_keep:]:
-                try:
-                    os.remove(old)
-                except:
-                    pass
-        except:
-            pass
-
-    def clear_temp(self):
-        count = 0
-        try:
-            for f in os.listdir(TEMP_DIR):
-                try:
-                    os.remove(os.path.join(TEMP_DIR, f))
-                    count += 1
-                except:
-                    pass
-            self.log(f"[CLEAN] ลบไฟล์ temp: {count} ไฟล์")
-        except Exception as e:
-            self.log(f"[ERROR] ล้าง temp ล้มเหลว: {e}")
-
-# ---------------- Main ----------------
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
-    root = tk.Tk()
-    app = YouTubeTTS(root)
-    app.log("[SYSTEM] พร้อมทำงาน ✅ (playsound3 non-blocking)")
-    root.protocol("WM_DELETE_WINDOW", lambda: (app.stop_system(), root.destroy()))
-    root.mainloop()
+    main()
