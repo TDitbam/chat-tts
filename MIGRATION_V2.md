@@ -29,3 +29,9 @@ python main_v3.py
 
 ## Dependency note
 - `requirements.txt` currently pins `tkinterweb==4.23.3` to match requested Windows dependency set.
+
+## Replit (run on cloud, no local PC run)
+- New web entrypoint: `replit_web.py`
+- Replit run config is included in `.replit` (`python replit_web.py`).
+- Open the Replit web URL, put YouTube live URL + voice, then press Start.
+- Generated audio is playable directly in browser and auto-pruned to latest 10 files.

@@ -1,0 +1,2 @@
+run = "python replit_web.py"
+modules = ["python-3.10"]
