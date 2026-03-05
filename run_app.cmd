@@ -16,7 +16,15 @@ if exist requirements.txt (
   pip install -r requirements.txt || goto :error
 )
 
+<<<<<<< ours
+<<<<<<< ours
 python main.py
+=======
+python main_v3.py
+>>>>>>> theirs
+=======
+python main_v3.py
+>>>>>>> theirs
 set EXIT_CODE=%ERRORLEVEL%
 
 if not "%EXIT_CODE%"=="0" (

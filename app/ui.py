@@ -1,4 +1,12 @@
 import os
+<<<<<<< ours
+<<<<<<< ours
+=======
+import configparser
+>>>>>>> theirs
+=======
+import configparser
+>>>>>>> theirs
 import queue
 import threading
 import time
@@ -8,6 +16,14 @@ from datetime import datetime, timedelta
 from tkinter import ttk, scrolledtext, messagebox, filedialog
 
 from app.config import (
+<<<<<<< ours
+<<<<<<< ours
+=======
+    APP_CONFIG_FILE,
+>>>>>>> theirs
+=======
+    APP_CONFIG_FILE,
+>>>>>>> theirs
     DEFAULT_VOICE,
     LOG_DIR,
     MAX_RECENT_MESSAGE_KEYS,
@@ -57,10 +73,27 @@ class YouTubeTTSApp:
         self.recent_messages: dict[tuple[str, str], list[datetime]] = {}
 
         self.log_buffer: list[str] = []
+<<<<<<< ours
+<<<<<<< ours
 
         self.setup_ui()
         self.reload_voices(silent=True)
         self.bind_validators()
+=======
+=======
+>>>>>>> theirs
+        self.config_path = APP_CONFIG_FILE
+        self._loading_config = False
+
+        self.setup_ui()
+        self.reload_voices(silent=True)
+        self.load_config()
+        self.bind_validators()
+        self.setup_autosave()
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
         threading.Thread(target=self.ipc_poster_thread, daemon=True).start()
 
     def setup_ui(self) -> None:
@@ -143,6 +176,78 @@ class YouTubeTTSApp:
         self.min_delay_entry.bind("<FocusOut>", lambda _: self.validate_delays())
         self.max_delay_entry.bind("<FocusOut>", lambda _: self.validate_delays())
 
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+    def setup_autosave(self) -> None:
+        self.voice_var.trace_add("write", lambda *_: self._autosave())
+        self.delay_per_char.trace_add("write", lambda *_: self._autosave())
+        self.min_delay.trace_add("write", lambda *_: self._autosave())
+        self.max_delay.trace_add("write", lambda *_: self._autosave())
+        self.spam_window.trace_add("write", lambda *_: self._autosave())
+        self.spam_threshold.trace_add("write", lambda *_: self._autosave())
+        self.url_entry.bind("<FocusOut>", lambda _: self._autosave())
+
+    def _autosave(self) -> None:
+        if self._loading_config:
+            return
+        self.save_config()
+
+    def load_config(self) -> None:
+        parser = configparser.ConfigParser()
+        if not os.path.exists(self.config_path):
+            return
+
+        parser.read(self.config_path, encoding="utf-8")
+        if "settings" not in parser:
+            return
+
+        data = parser["settings"]
+        self._loading_config = True
+        try:
+            self.url_entry.delete(0, tk.END)
+            self.url_entry.insert(0, data.get("youtube_url", ""))
+
+            self.delay_per_char.set(data.getfloat("delay_per_char", fallback=self.delay_per_char.get()))
+            self.min_delay.set(data.getint("min_delay", fallback=self.min_delay.get()))
+            self.max_delay.set(data.getint("max_delay", fallback=self.max_delay.get()))
+            self.spam_window.set(data.getint("spam_window", fallback=self.spam_window.get()))
+            self.spam_threshold.set(data.getint("spam_threshold", fallback=self.spam_threshold.get()))
+
+            voice = data.get("voice", self.voice)
+            if voice in self.available_voices:
+                self.voice_var.set(voice)
+                self.set_voice(voice)
+
+            profanity_raw = data.get("profanity_list", "")
+            if profanity_raw.strip():
+                self.profanity_list = {w.strip().lower() for w in profanity_raw.split(",") if w.strip()}
+
+            self.validate_delays()
+        finally:
+            self._loading_config = False
+
+    def save_config(self) -> None:
+        parser = configparser.ConfigParser()
+        parser["settings"] = {
+            "youtube_url": self.url_entry.get().strip(),
+            "voice": self.voice,
+            "delay_per_char": str(self.delay_per_char.get()),
+            "min_delay": str(self.min_delay.get()),
+            "max_delay": str(self.max_delay.get()),
+            "spam_window": str(self.spam_window.get()),
+            "spam_threshold": str(self.spam_threshold.get()),
+            "profanity_list": ",".join(sorted(self.profanity_list)),
+        }
+        with open(self.config_path, "w", encoding="utf-8") as cfg_file:
+            parser.write(cfg_file)
+
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
     def validate_delays(self) -> DelayConfig:
         try:
             cfg = DelayConfig(
@@ -178,6 +283,14 @@ class YouTubeTTSApp:
     def set_voice(self, voice_id: str) -> None:
         self.voice = voice_id.strip() or DEFAULT_VOICE
         self.log(f"[INFO] ตั้งค่าเสียงเป็น: {self.voice}")
+<<<<<<< ours
+<<<<<<< ours
+=======
+        self._autosave()
+>>>>>>> theirs
+=======
+        self._autosave()
+>>>>>>> theirs
 
     def add_profanity(self) -> None:
         txt = self.black_entry.get().strip()
@@ -192,6 +305,14 @@ class YouTubeTTSApp:
                 added += 1
         self.black_entry.delete(0, tk.END)
         self.log(f"[FILTER] เพิ่มคำใน blacklist: {added} รายการ")
+<<<<<<< ours
+<<<<<<< ours
+=======
+        self._autosave()
+>>>>>>> theirs
+=======
+        self._autosave()
+>>>>>>> theirs
 
     def show_profanity_list(self) -> None:
         if not self.profanity_list:
@@ -299,6 +420,14 @@ class YouTubeTTSApp:
         self.stop_btn.config(state="disabled")
         self.status_var.set("Stopped")
         self.log("[INFO] ระบบหยุดเรียบร้อย")
+<<<<<<< ours
+<<<<<<< ours
+=======
+        self.save_config()
+>>>>>>> theirs
+=======
+        self.save_config()
+>>>>>>> theirs
 
     def tts_worker(self) -> None:
         self.log("[TTS_WORKER] เริ่มทำงาน")

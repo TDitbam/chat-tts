@@ -7,3 +7,11 @@ SPAM_REPEAT_THRESHOLD = 3
 MAX_RECENT_MESSAGE_KEYS = 3000
 MAX_PLAY_DURATION_SECONDS = 90.0
 MAX_TTS_CACHE_FILES = 10
+<<<<<<< ours
+<<<<<<< ours
+=======
+APP_CONFIG_FILE = "config.ini"
+>>>>>>> theirs
+=======
+APP_CONFIG_FILE = "config.ini"
+>>>>>>> theirs

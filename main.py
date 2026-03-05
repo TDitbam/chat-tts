@@ -12,7 +12,7 @@ import pytchat
 from playsound3 import playsound
 
 # ================= CONFIG =================
-YOUTUBE_VIDEO_ID = "4r6R0GL5c7U"   # ใส่ Video ID หรือ URL ไลฟ์
+YOUTUBE_VIDEO_ID = "nwfQJ8zwAiI"   # ใส่ Video ID หรือ URL ไลฟ์
 VOICE = "th-TH-PremwadeeNeural"
 
 CACHE_DIR = "tts_cache"

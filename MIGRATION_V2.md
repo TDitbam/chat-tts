@@ -16,6 +16,14 @@ python main_v3.py
 - `app/ui.py` : Tkinter UI + orchestration logic
 
 ## Key fixes kept/improved
+<<<<<<< ours
+<<<<<<< ours
+=======
+- Auto-save settings to `config.ini` (URL, voice, delays, spam settings, profanity list).
+>>>>>>> theirs
+=======
+- Auto-save settings to `config.ini` (URL, voice, delays, spam settings, profanity list).
+>>>>>>> theirs
 - Delay validation and normalization.
 - Better YouTube video-id extraction (`watch`, `youtu.be`, `live`, `shorts`, `embed`).
 - Global pruning for spam-tracking memory growth.
@@ -25,3 +33,15 @@ python main_v3.py
 ## Windows helper scripts
 - `run_app.cmd` : create/use `.venv`, install deps, run `main_v3.py`.
 - `pyinstaller.cmd` : create/use `.venv`, install deps + pyinstaller, build Windows executable into `dist\chat-tts\`.
+<<<<<<< ours
+<<<<<<< ours
+=======
+
+## Dependency note
+- `requirements.txt` currently pins `tkinterweb==4.23.3` to match requested Windows dependency set.
+>>>>>>> theirs
+=======
+
+## Dependency note
+- `requirements.txt` currently pins `tkinterweb==4.23.3` to match requested Windows dependency set.
+>>>>>>> theirs
