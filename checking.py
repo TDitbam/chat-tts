@@ -1,8 +1,13 @@
 import psutil
-import os , time
+import os , time , configparser
+
+config = configparser.ConfigParser()
+config.read("config.ini")
+
+py_ver = config.get("python","version")
 
 while True:
-    program_name = "python.exe"
+    program_name = py_ver
     running = False
 
     for process in psutil.process_iter(['name']):
