@@ -1,24 +1,32 @@
-import psutil
-import os , time , configparser
+import subprocess
+import time
+import sys
+import os
 
-config = configparser.ConfigParser()
-config.read("config.ini")
+# ชื่อไฟล์สคริปต์หลัก
+TARGET_SCRIPT = "main.py"
 
-py_ver = config.get("python","version")
+def run_target():
+    # 0x08000000 = CREATE_NO_WINDOW (ห้ามเปิดหน้าต่างใหม่)
+    return subprocess.Popen(
+        [sys.executable, TARGET_SCRIPT],
+        creationflags=0x08000000 if os.name == 'nt' else 0
+    )
 
-while True:
-    program_name = py_ver
-    running = False
+def monitor():
+    print(f"[{time.strftime('%H:%M:%S')}] 🛡️ Watcher Active: Monitoring {TARGET_SCRIPT}")
+    process = run_target()
 
-    for process in psutil.process_iter(['name']):
-        if process.info['name'] == program_name:
-            running = True
-            break
+    while True:
+        # ตรวจสอบสถานะ Process ทุก 5 วินาที
+        if process.poll() is not None:
+            print(f"[{time.strftime('%H:%M:%S')}] ⚠️ Main script stopped. Restarting silently...")
+            time.sleep(2)
+            process = run_target()
+        time.sleep(5)
 
-
-    if running:
-        print("Program is running")
-    else:
-        print("Program is NOT running")
-        os.system("start cmd /k python main.py")
-    time.sleep(5)
+if __name__ == "__main__":
+    try:
+        monitor()
+    except KeyboardInterrupt:
+        print("\nStopping Watcher and System...")

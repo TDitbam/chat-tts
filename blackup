@@ -12,8 +12,11 @@ import configparser
 import pytchat
 from playsound3 import playsound
 
-# ================= CONFIG =================
-sys.stdout.reconfigure(encoding='utf-8')
+# --- ตรวจเช็กไฟล์ Config ก่อนเริ่ม ---
+if not os.path.exists("config.ini"):
+    print("❌ ไม่พบไฟล์ config.ini กรุณาสร้างไฟล์ก่อน!")
+    sys.exit()
+
 config = configparser.ConfigParser()
 config.read("config.ini")
 
@@ -24,7 +27,7 @@ try:
     MAX_DELAY = config.getfloat("settings", "MAX_DELAY")
     CLEAR_EVERY = config.getint("settings", "CLEAR_EVERY")
 except Exception as e:
-    print(f"❌ Error in config.ini: {e}")
+    print(f"❌ ตั้งค่าใน config.ini ไม่ถูกต้อง: {e}")
     sys.exit()
 
 CACHE_DIR = "tts_cache"
@@ -35,28 +38,12 @@ running = True
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
 
-# ---------- GUI ----------
 def start_gui():
     root = tk.Tk()
-    root.title("TTS Chat Bridge")
-    root.geometry("300x100")
-    
-    # ถ้าถูกรันโดย Watcher (ผ่าน argument) ให้ซ่อนหน้าต่าง
-    if "--silent" in sys.argv:
-        root.withdraw() 
-
-    label = tk.Label(root, text="🟢 TTS System Active\nCheck Console for logs", pady=20)
-    label.pack()
-
-    def on_close():
-        global running
-        running = False
-        root.destroy()
-
-    root.protocol("WM_DELETE_WINDOW", on_close)
+    # root.withdraw() # ปิดไว้ก่อนเพื่อดูว่า GUI ขึ้นไหมตอน Debug
+    root.title("Debug Mode")
     root.mainloop()
 
-# ---------- TTS WORKER ----------
 def tts_worker():
     while running:
         try:
@@ -69,47 +56,43 @@ def tts_worker():
         cmd = [sys.executable, "-m", "edge_tts", "--voice", VOICE, "--text", text, "--write-media", filename]
 
         try:
-            # รัน subprocess แบบไม่เปิดหน้าต่างดำ
-            subprocess.run(cmd, capture_output=True, check=True, creationflags=0x08000000)
+            result = subprocess.run(cmd, capture_output=True, text=True, creationflags=0x08000000)
+            if result.returncode != 0:
+                log(f"❌ edge-tts Error: {result.stderr}")
+                continue
+
             if os.path.exists(filename):
                 playsound(filename)
-                try: os.remove(filename)
-                except: pass
-            time.sleep(min(MAX_DELAY, len(text) * DELAY_PER_CHAR))
+                os.remove(filename)
         except Exception as e:
-            log(f"❌ TTS Error: {e}")
+            log(f"❌ Playback Error: {e}")
         tts_queue.task_done()
 
-# ---------- MAIN ----------
 def main():
     global running
-    log(f"🚀 Connecting to: {YOUTUBE_VIDEO_ID}")
-
-    # เริ่ม TTS Thread
+    log(f"🚀 กำลังเชื่อมต่อ YouTube ID: {YOUTUBE_VIDEO_ID}")
+    
     worker = threading.Thread(target=tts_worker, daemon=True)
     worker.start()
-
-    # เริ่ม GUI Thread (ใส่กลับมาให้แล้วครับ!)
-    gui_thread = threading.Thread(target=start_gui, daemon=True)
-    gui_thread.start()
 
     try:
         chat = pytchat.create(video_id=YOUTUBE_VIDEO_ID)
         if not chat.is_alive():
-            log("❌ ดึงแชทไม่ได้! เช็ก Video ID ใน config.ini หรือยัง?")
+            log("❌ ไม่สามารถดึงแชทได้ (ID อาจผิด หรือไลฟ์จบแล้ว)")
             return
 
+        log("✅ เชื่อมต่อสำเร็จ! รอรับข้อความแชท...")
         while running and chat.is_alive():
             for c in chat.get().sync_items():
                 msg = f"{c.author.name} พูดว่า {c.message}"
                 log(f"💬 {msg}")
                 tts_queue.put(msg)
             time.sleep(0.5)
-    except KeyboardInterrupt:
-        log("⛔ Stopping...")
+    except Exception as e:
+        log(f"⚠️ Main Loop Error: {e}")
     finally:
         running = False
-        tts_queue.put(None)
+        log("⛔ โปรแกรมหยุดทำงาน")
 
 if __name__ == "__main__":
     main()
