@@ -24,7 +24,7 @@
 
 - ดึงแชทจาก YouTube Live ผ่าน HTTP โดยตรง — ไม่ต้องใช้ API key
 - สังเคราะห์เสียงด้วย `edge-tts` รองรับเสียงภาษาไทยหลายแบบ
-- GUI แยกต่างหาก (`GUI.py`) พร้อม auto-restart เมื่อ backend crash
+- GUI แยกต่างหาก (`main.py`) พร้อม auto-restart เมื่อ backend crash
 - Auto-reconnect เมื่อแชทหลุด
 - ตั้งค่าได้ผ่าน `config.ini` โดยไม่ต้องแตะโค้ด
 
