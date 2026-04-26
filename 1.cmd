@@ -1,1 +1,0 @@
-start cmd /k python -m auto_py_to_exe
