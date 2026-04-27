@@ -2,15 +2,15 @@
 chcp 65001 >nul
 echo [*] Building chat-tts.exe ...
 
-py -m PyInstaller --onefile --clean --name chat-tts ^
+py -m PyInstaller ^
+  --onefile ^
+  --clean ^
+  --name chat-tts ^
   --add-data "config.ini;." ^
   --add-data "api.py;." ^
   --icon=icon.ico ^
   --hidden-import=edge_tts ^
   --hidden-import=playsound3 ^
-  --hidden-import=asyncio ^
-  --hidden-import=configparser ^
-  --hidden-import=threading ^
   main.py
 
 echo.
