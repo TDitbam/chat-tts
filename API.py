@@ -10,13 +10,14 @@ import re
 import time
 import json
 import queue
+import asyncio
 import threading
-import subprocess
 import platform
 import configparser
 from datetime import datetime
 import urllib.request
 import urllib.error
+import edge_tts
 
 # ── stdout safe reconfigure ──
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -50,7 +51,11 @@ except Exception as e:
     print(f"❌ Error in config.ini: {e}")
     sys.exit(1)
 
-BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, "frozen", False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 CACHE_DIR = os.path.join(BASE_DIR, "tts_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
@@ -67,10 +72,7 @@ def log(msg: str) -> None:
         pass
 
 
-# ================== YOUTUBE CHAT (ไม่ใช้ pytchat) ==================
-# ดึงจากหน้า /live_chat?is_popout=1&v=... ซึ่งมี ytInitialData ที่ถูกต้อง
-# และใช้ continuation token จาก liveChatRenderer โดยตรง
-
+# ================== YOUTUBE CHAT ==================
 _YT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -93,23 +95,15 @@ def _fetch_url(url: str, timeout: int = 15) -> str | None:
 
 
 def _get_live_chat_config(video_id: str) -> tuple[str | None, str | None, str | None]:
-    """
-    ดึง continuation token จากหน้า /live_chat (popout) ซึ่ง YouTube
-    ใช้จริงสำหรับ get_live_chat API — token จากหน้า watch ใช้ไม่ได้
-    คืน (continuation, api_key, client_version)
-    """
-    # ใช้หน้า live_chat embed — มี ytInitialData.contents.liveChatRenderer
     url = f"https://www.youtube.com/live_chat?is_popout=1&v={video_id}"
     html = _fetch_url(url)
     if not html:
         return None, None, None
 
-    # --- ytInitialData JSON block ---
     m = re.search(r"ytInitialData\s*=\s*(\{.+?\});\s*(?:var |window\[|</script)", html, re.DOTALL)
     if m:
         try:
             data = json.loads(m.group(1))
-            # path: contents.liveChatRenderer.continuations[0].*.continuation
             lc = (
                 data.get("contents", {})
                     .get("liveChatRenderer", {})
@@ -125,7 +119,6 @@ def _get_live_chat_config(video_id: str) -> tuple[str | None, str | None, str | 
     else:
         continuation = None
 
-    # fallback regex ถ้า JSON parse ไม่ได้
     if not continuation:
         for pat in [
             r'"invalidationContinuationData"\s*:\s*\{"continuation"\s*:\s*"([^"]+)"',
@@ -137,11 +130,9 @@ def _get_live_chat_config(video_id: str) -> tuple[str | None, str | None, str | 
                 continuation = cm.group(1)
                 break
 
-    # --- INNERTUBE_API_KEY ---
     key_m = re.search(r'"INNERTUBE_API_KEY"\s*:\s*"([^"]+)"', html)
     api_key = key_m.group(1) if key_m else "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"
 
-    # --- INNERTUBE_CLIENT_VERSION ---
     ver_m = re.search(r'"INNERTUBE_CLIENT_VERSION"\s*:\s*"([^"]+)"', html)
     client_ver = ver_m.group(1) if ver_m else "2.20240415.01.00"
 
@@ -154,10 +145,6 @@ def _get_live_chat_config(video_id: str) -> tuple[str | None, str | None, str | 
 def _fetch_live_chat(
     continuation: str, api_key: str, client_ver: str
 ) -> tuple[list[str], str | None]:
-    """
-    POST ไปที่ get_live_chat endpoint พร้อม context ที่ครบถ้วน
-    คืน ([messages], next_continuation_token)
-    """
     url = f"https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?key={api_key}&prettyPrint=false"
 
     payload = json.dumps({
@@ -207,7 +194,6 @@ def _fetch_live_chat(
     try:
         cr = data["continuationContents"]["liveChatContinuation"]
 
-        # next continuation token
         for c in cr.get("continuations", []):
             tok = (
                 c.get("invalidationContinuationData", {}).get("continuation")
@@ -218,7 +204,6 @@ def _fetch_live_chat(
                 next_cont = tok
                 break
 
-        # parse messages
         for action in cr.get("actions", []):
             item = action.get("addChatItemAction", {}).get("item", {})
             renderer = (
@@ -246,10 +231,6 @@ def _fetch_live_chat(
 
 
 def chat_reader() -> None:
-    """
-    YouTube Live Chat loop ด้วย HTTP ตรง
-    ไม่มี signal ใดๆ — รันใน thread ย่อยได้ปกติ
-    """
     while not _stop_event.is_set():
         log("🔌 กำลัง connect YouTube chat...")
 
@@ -284,7 +265,6 @@ def chat_reader() -> None:
                 except queue.Full:
                     log("⚠️ Queue เต็ม — ข้ามข้อความ")
 
-            # YouTube live chat อัปเดตทุก ~3-5 วินาที
             _stop_event.wait(3)
 
         if not _stop_event.is_set():
@@ -295,28 +275,16 @@ def chat_reader() -> None:
 
 
 # ================== TTS WORKER ==================
-def _run_edge_tts(text: str, filename: str, timeout: int = 30) -> bool:
-    cmd = [
-        sys.executable, "-m", "edge_tts",
-        "--voice", VOICE,
-        "--text", text,
-        "--write-media", filename,
-    ]
-    kwargs: dict = dict(capture_output=True, text=True, timeout=timeout)
-    if IS_WINDOWS:
-        kwargs["creationflags"] = 0x08000000
+def _run_edge_tts(text: str, filename: str) -> bool:
+    async def _synthesize():
+        communicate = edge_tts.Communicate(text, VOICE)
+        await communicate.save(filename)
 
     try:
-        result = subprocess.run(cmd, **kwargs)
-        if result.returncode != 0:
-            log(f"❌ edge-tts error: {result.stderr.strip()[:200]}")
-            return False
+        asyncio.run(_synthesize())
         return True
-    except subprocess.TimeoutExpired:
-        log("⏱️ edge-tts timeout — ข้ามข้อความนี้")
-        return False
     except Exception as e:
-        log(f"❌ edge-tts exception: {e}")
+        log(f"❌ edge-tts error: {e}")
         return False
 
 
@@ -374,7 +342,7 @@ def tts_worker() -> None:
         tts_queue.task_done()
 
 
-# ================== GUI (main thread เท่านั้น) ==================
+# ================== GUI ==================
 def build_gui():
     if not _HAS_TK:
         return None
@@ -419,7 +387,6 @@ def main() -> None:
     reader = threading.Thread(target=chat_reader, daemon=True, name="chat-reader")
     reader.start()
 
-    # GUI ต้องอยู่ใน main thread เสมอ
     root = build_gui()
 
     try:
