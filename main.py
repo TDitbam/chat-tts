@@ -11,7 +11,12 @@ import pytchat
 import edge_tts
 from playsound3 import playsound
 
-sys.stdout.reconfigure(encoding="utf-8")
+# ================= SAFE STDOUT =================
+try:
+    if sys.stdout is not None and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+except:
+    pass
 
 # ================= CONFIG =================
 CONFIG_FILE = "config.ini"
@@ -24,6 +29,9 @@ def load_config():
     return config
 
 def extract_video_id(url_or_id: str) -> str:
+    if not url_or_id:
+        return ""
+
     if "http" not in url_or_id:
         return url_or_id.strip()
 
@@ -38,7 +46,7 @@ def extract_video_id(url_or_id: str) -> str:
         if m:
             return m.group(1)
 
-    return url_or_id
+    return url_or_id.strip()
 
 config = load_config()
 
@@ -47,11 +55,15 @@ YOUTUBE_VIDEO_ID = extract_video_id(
 )
 
 PRIMARY_VOICE = "th-TH-PremwadeeNeural"
-FALLBACK_VOICES = ["th-TH-AcharaNeural", "en-US-JennyNeural"]
+FALLBACK_VOICES = [
+    "th-TH-th-TH-AcharaNeural",
+    "th-TH-NiwatNeural"
+]
 
 DELAY_PER_CHAR = config.getfloat("settings", "DELAY_PER_CHAR", fallback=0.03)
-MAX_DELAY = config.getfloat("settings", "MAX_DELAY", fallback=2.0)
+MAX_DELAY      = config.getfloat("settings", "MAX_DELAY", fallback=2.0)
 
+# ================= GLOBAL =================
 audio_queue = queue.Queue(maxsize=50)
 
 # ================= UTILS =================
@@ -66,19 +78,19 @@ def safe_filename():
 
 # ================= TTS =================
 async def tts_try(text, file_path):
-    for voice in [PRIMARY_VOICE] + FALLBACK_VOICES:
+    voices = [PRIMARY_VOICE] + FALLBACK_VOICES
+
+    for voice in voices:
         try:
             communicate = edge_tts.Communicate(text, voice)
             await communicate.save(file_path)
             return True
-        except Exception:
-            log(f"voice fail: {voice}")
+        except Exception as e:
+            log(f"voice fail: {voice} | {e}")
+
     return False
 
 def tts_worker():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
     while True:
         try:
             text = audio_queue.get(timeout=1)
@@ -90,7 +102,8 @@ def tts_worker():
         try:
             log(f"TTS: {text[:40]}")
 
-            ok = loop.run_until_complete(tts_try(text, file_path))
+            # 🔥 FIX หลัก: ไม่ใช้ loop เดิมแล้ว
+            ok = asyncio.run(tts_try(text, file_path))
 
             if ok and os.path.exists(file_path):
                 log(f"▶️ PLAY {file_path}")
@@ -103,38 +116,70 @@ def tts_worker():
 
         finally:
             if os.path.exists(file_path):
-                os.remove(file_path)
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
 
         time.sleep(calc_delay(text))
 
 # ================= MAIN =================
 def main():
-    log("=== START ===")
+    log("=== START SYSTEM ===")
 
     threading.Thread(target=tts_worker, daemon=True).start()
 
     while True:
+        chat = None
+        last_msg_time = time.time()
+
         try:
+            if not YOUTUBE_VIDEO_ID:
+                log("❌ ไม่มี YOUTUBE_VIDEO_ID")
+                time.sleep(5)
+                continue
+
             log("Connecting chat...")
             chat = pytchat.create(video_id=YOUTUBE_VIDEO_ID)
 
             while chat.is_alive():
-                for c in chat.get().sync_items():
-                    msg = f"{c.author.name} พูดว่า {c.message}"
-                    log(msg)
+                data = chat.get()
+                items = list(data.sync_items())
+
+                if items:
+                    last_msg_time = time.time()
+
+                for c in items:
+                    msg = f"{c.author.name} พูดว่า {c.message}".strip()
 
                     try:
                         audio_queue.put_nowait(msg)
                     except queue.Full:
                         log("⚠️ queue full")
 
+                # timeout กันค้าง
+                if time.time() - last_msg_time > 60:
+                    log("⚠️ timeout reconnect")
+                    break
+
                 time.sleep(0.5)
 
         except Exception as e:
             log(f"CHAT ERROR: {e}")
 
-        log("♻️ reconnect 5s")
+        finally:
+            if chat is not None:
+                try:
+                    chat.terminate()
+                except:
+                    pass
+
+        log("♻️ restart 5s")
         time.sleep(5)
 
+# ================= RUN =================
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("🛑 stopped")
