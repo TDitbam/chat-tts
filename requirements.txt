@@ -2,3 +2,4 @@ pytchat
 edge-tts
 playsound3
 customtkinter
+pyinstaller
