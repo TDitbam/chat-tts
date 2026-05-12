@@ -1,4 +1,16 @@
-__pycache__
-build
-dist
-*.pyc
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Project Specific
+temp_audio/
+msg_queue/
+config.ini
+
+# OS
+.DS_Store
+Thumbs.db

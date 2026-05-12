@@ -1,3 +1,4 @@
-playsound3==3.3.1
-edge-tts==7.2.8
-pytchat==0.5.5
+pytchat
+edge-tts
+playsound3
+customtkinter
