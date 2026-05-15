@@ -46,7 +46,7 @@ python run_gui.py
    - **Facebook:** URL ของ Live
    - **Twitch:** ชื่อ Channel
    - **TikTok:** ชื่อผู้ใช้ (เช่น @username)
-4. เลือกเสียง และตั้งค่า Delay ตามต้องการ
+4. เลือกเสียง และตั้งค่า Delay ตามต้องการ 
 5. กด **Start System**
 
 ### แบบ Command Line (CLI)
