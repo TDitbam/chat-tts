@@ -10,6 +10,7 @@ ENV/
 temp_audio/
 msg_queue/
 config.ini
+logs/
 
 # OS
 .DS_Store
