@@ -9,6 +9,9 @@
   - **Facebook:** รองรับ Facebook Live URL
   - **Twitch:** เชื่อมต่อผ่านชื่อ Channel (รองรับ Anonymous Read-only)
   - **TikTok:** รองรับการดึงแชทจาก TikTok Live โดยตรง (ใช้เพียงชื่อผู้ใช้ @username)
+- **ระบบแปลภาษาแบบ Real-time (Auto-Translate):**
+  - แปลข้อความจากภาษาต่างประเทศเป็นภาษาไทยโดยอัตโนมัติก่อนอ่านออกเสียง
+  - รองรับการแปลแบบเรียลไทม์ผ่าน Google Translate (ไม่ใช้ API Key)
 - **ระบบเสียงภาษาไทยคุณภาพสูง:**
   - ใช้ **Edge TTS** (Microsoft Azure) ให้เสียงที่เหมือนมนุษย์
   - มีเสียงให้เลือก (เช่น Premwadee, Niwat)
