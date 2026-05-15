@@ -60,6 +60,7 @@ class ChatTTSGui(ctk.CTk):
         self.fb_enabled = ctk.StringVar(value=self.config.get("settings", "fb_enabled", fallback="False"))
         self.tw_enabled = ctk.StringVar(value=self.config.get("settings", "tw_enabled", fallback="False"))
         self.tk_enabled = ctk.StringVar(value=self.config.get("settings", "tk_enabled", fallback="False"))
+        self.auto_translate = ctk.StringVar(value=self.config.get("settings", "auto_translate", fallback="False"))
 
         # --- YouTube Section ---
         self.yt_frame = ctk.CTkFrame(self.main_frame)
@@ -97,20 +98,22 @@ class ChatTTSGui(ctk.CTk):
         self.gen_frame = ctk.CTkFrame(self.main_frame)
         self.gen_frame.pack(pady=10, padx=10, fill="x")
         
-        ctk.CTkLabel(self.gen_frame, text="Voice:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        ctk.CTkCheckBox(self.gen_frame, text="Auto-Translate (แปลภาษาอัตโนมัติ)", variable=self.auto_translate, onvalue="True", offvalue="False").grid(row=0, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+
+        ctk.CTkLabel(self.gen_frame, text="Voice:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.voice_var = ctk.StringVar(value=self.config.get("settings", "VOICE", fallback="th-TH-PremwadeeNeural"))
         self.voice_menu = ctk.CTkOptionMenu(self.gen_frame, values=["th-TH-PremwadeeNeural", "th-TH-NiwatNeural"], variable=self.voice_var)
-        self.voice_menu.grid(row=0, column=1, padx=10, pady=5, sticky="w")
+        self.voice_menu.grid(row=1, column=1, padx=10, pady=5, sticky="w")
 
-        ctk.CTkLabel(self.gen_frame, text="Delay Per Char:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        ctk.CTkLabel(self.gen_frame, text="Delay Per Char:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
         self.entry_delay_char = ctk.CTkEntry(self.gen_frame, width=100)
         self.entry_delay_char.insert(0, self.config.get("settings", "delay_per_char", fallback="0.03"))
-        self.entry_delay_char.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+        self.entry_delay_char.grid(row=2, column=1, padx=10, pady=5, sticky="w")
 
-        ctk.CTkLabel(self.gen_frame, text="Max Delay:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        ctk.CTkLabel(self.gen_frame, text="Max Delay:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
         self.entry_max_delay = ctk.CTkEntry(self.gen_frame, width=100)
         self.entry_max_delay.insert(0, self.config.get("settings", "max_delay", fallback="2.0"))
-        self.entry_max_delay.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+        self.entry_max_delay.grid(row=3, column=1, padx=10, pady=5, sticky="w")
 
         self.label_status = ctk.CTkLabel(self, text="Status: Stopped", text_color="red")
         self.label_status.pack(pady=5)
@@ -128,6 +131,7 @@ class ChatTTSGui(ctk.CTk):
         self.config.set("settings", "fb_enabled", self.fb_enabled.get())
         self.config.set("settings", "tw_enabled", self.tw_enabled.get())
         self.config.set("settings", "tk_enabled", self.tk_enabled.get())
+        self.config.set("settings", "auto_translate", self.auto_translate.get())
         self.config.set("settings", "YOUTUBE_VIDEO_ID", self.entry_yt.get())
         self.config.set("settings", "fb_url", self.entry_fb.get())
         self.config.set("settings", "tw_channel", self.entry_tw.get())
@@ -151,7 +155,8 @@ class ChatTTSGui(ctk.CTk):
                 "tk_username": self.entry_tk.get(),
                 "voice": self.voice_var.get(),
                 "delay_per_char": self.entry_delay_char.get(),
-                "max_delay": self.entry_max_delay.get()
+                "max_delay": self.entry_max_delay.get(),
+                "auto_translate": self.auto_translate.get()
             }
             self.engine.start(conf)
             self.btn_toggle.configure(text="Stop System", fg_color="red", hover_color="#8B0000")

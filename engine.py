@@ -7,12 +7,14 @@ import edge_tts
 import pytchat
 import re
 import traceback
+from deep_translator import GoogleTranslator
 from playsound3 import playsound
 from logger import get_logger
 from chat_downloader import ChatDownloader
 from twitchio.ext import commands as twitch_commands
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import CommentEvent
+from gTTS import gTTS
 
 logger = get_logger("Engine")
 
@@ -31,6 +33,8 @@ class ChatTTSEngine:
         self.voice = "th-TH-PremwadeeNeural"
         self.delay_per_char = 0.03
         self.max_delay = 2.0
+        self.auto_translate = False
+        self.translator = GoogleTranslator(source='auto', target='th')
         
         # Platform Settings
         self.platforms = {
@@ -62,7 +66,7 @@ class ChatTTSEngine:
                     for c in chat.get().sync_items():
                         if c.id not in processed_ids:
                             processed_ids.add(c.id)
-                            self.msg_queue.put(f"{c.author.name} พูดว่า {c.message}")
+                            self.msg_queue.put({"author": c.author.name, "message": c.message})
                             if len(processed_ids) > 1000: processed_ids.clear()
                     time.sleep(0.5)
                 if self.is_running: time.sleep(5)
@@ -80,7 +84,7 @@ class ChatTTSEngine:
                     if not self.is_running: break
                     author = message.get('author', {}).get('name', 'Unknown')
                     text = message.get('message', '')
-                    self.msg_queue.put(f"{author} พูดว่า {text}")
+                    self.msg_queue.put({"author": author, "message": text})
                 if self.is_running: time.sleep(5)
             except Exception as e:
                 logger.error(f"Facebook Error: {e}")
@@ -98,7 +102,7 @@ class ChatTTSEngine:
 
             async def event_message(self, message):
                 if message.echo: return
-                self.queue.put(f"{message.author.name} พูดว่า {message.content}")
+                self.queue.put({"author": message.author.name, "message": message.content})
 
         while self.is_running:
             try:
@@ -137,7 +141,7 @@ class ChatTTSEngine:
                     if not self.is_running:
                         await client.stop()
                         return
-                    self.msg_queue.put(f"{event.user.nickname} พูดว่า {event.comment}")
+                    self.msg_queue.put({"author": event.user.nickname, "message": event.comment})
 
                 @client.on("disconnect")
                 async def on_disconnect(event):
@@ -154,7 +158,24 @@ class ChatTTSEngine:
         while self.is_running:
             try:
                 if not self.msg_queue.empty():
-                    text = self.msg_queue.get()
+                    data = self.msg_queue.get()
+                    if isinstance(data, str):
+                        text = data
+                    else:
+                        author = data.get("author", "Unknown")
+                        message = data.get("message", "")
+                        
+                        if self.auto_translate:
+                            try:
+                                if not any('\u0e00' <= char <= '\u0e7f' for char in message):
+                                    translated = self.translator.translate(message)
+                                    logger.info(f"Translated: {message} -> {translated}")
+                                    message = translated
+                            except Exception as te:
+                                logger.error(f"Translation Error: {te}")
+                        
+                        text = f"{author} พูดว่า {message}"
+
                     path = os.path.join(self.audio_dir, f"{int(time.time()*1000)}.mp3")
                     
                     try:
@@ -204,6 +225,7 @@ class ChatTTSEngine:
         self.voice = config_dict.get("voice", "th-TH-PremwadeeNeural")
         self.delay_per_char = float(config_dict.get("delay_per_char", 0.03))
         self.max_delay = float(config_dict.get("max_delay", 2.0))
+        self.auto_translate = config_dict.get("auto_translate") == "True"
         
         def run_engine():
             try:

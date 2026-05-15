@@ -23,7 +23,8 @@ def main():
         "tk_username": config.get("settings", "tk_username", fallback=""),
         "voice": config.get("settings", "VOICE", fallback="th-TH-PremwadeeNeural"),
         "delay_per_char": config.get("settings", "delay_per_char", fallback="0.03"),
-        "max_delay": config.get("settings", "max_delay", fallback="2.0")
+        "max_delay": config.get("settings", "max_delay", fallback="2.0"),
+        "auto_translate": config.get("settings", "auto_translate", fallback="False")
     }
     
     if conf["yt_enabled"] == "True" and not conf["yt_id"]:

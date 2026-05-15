@@ -7,3 +7,4 @@ chat-downloader
 twitchio
 gTTS
 TikTokLive
+deep-translator
