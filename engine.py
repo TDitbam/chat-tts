@@ -14,7 +14,7 @@ from chat_downloader import ChatDownloader
 from twitchio.ext import commands as twitch_commands
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import CommentEvent
-from gTTS import gTTS
+from gtts import gTTS
 
 logger = get_logger("Engine")
 
