@@ -2,7 +2,6 @@ import customtkinter as ctk
 import configparser
 import sys
 import os
-import time
 import logging
 
 # Add core directory to path

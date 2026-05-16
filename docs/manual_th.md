@@ -1,61 +1,52 @@
-# 📘 คู่มือการใช้งาน ChatTTS (v2.2.0 Modified)
+# คู่มือการใช้งาน ChatTTS
 
-โปรแกรมสำหรับดึงแชทจาก Platform ต่างๆ (YouTube, Facebook, Twitch, TikTok) และแปลงเป็นเสียงพูด (TTS) อัตโนมัติ
+โปรแกรมนี้ใช้ดึงข้อความจาก `YouTube Live`, `Twitch Chat` และ `TikTok Live` แล้วแปลงเป็นเสียงพูดภาษาไทยอัตโนมัติ
 
----
+## เริ่มต้นใช้งาน
 
-## 🚀 วิธีเริ่มต้นใช้งาน
+### GUI
 
-1.  **เปิดโปรแกรม**: รันไฟล์ `run_gui.py` หรือรันผ่านไฟล์ `.exe` (ถ้ามีการ Build ไว้)
-2.  **ตั้งค่าเสียง**: เลือกเสียงที่ต้องการในเมนู Dropdown (แนะนำ: `th-TH-PremwadeeNeural`)
-3.  **กรอกข้อมูลแชท**:
-    *   **YouTube**: ใส่ลิงก์วิดีโอ หรือ Video ID
-    *   **Facebook**: ใส่ลิงก์วิดีโอแบบเต็ม (เช่น `https://www.facebook.com/username/videos/ID`)
-    *   **Twitch**: ใส่ชื่อช่อง (เช่น `tditbam`)
-    *   **TikTok**: ใส่ชื่อผู้ใช้ที่มีเครื่องหมาย @ (เช่น `@username`)
-4.  **กดปุ่ม Start**: เพื่อเริ่มทำงาน
+รัน:
 
----
+```bash
+python start_gui.py
+```
 
-## 📂 ระบบการเก็บ Log (การตรวจสอบปัญหา)
+จากนั้น:
 
-ระบบใหม่ได้แยกไฟล์ Log เพื่อให้ง่ายต่อการแก้บัค โดยจะอยู่ในโฟลเดอร์ `logs/`:
+1. เปิดแพลตฟอร์มที่ต้องการใช้งาน
+2. ใส่ `YouTube URL/ID`, `Twitch channel` หรือ `TikTok @username`
+3. เลือกเสียงและตั้งค่า delay
+4. กด `START SYSTEM`
 
-*   `facebook.txt`: ตรวจสอบปัญหาการเชื่อมต่อ Facebook
-*   `tiktok.txt`: ตรวจสอบ Error จาก TikTok Library
-*   `twitch.txt`: ตรวจสอบการเชื่อมต่อ IRC ของ Twitch
-*   `youtube.txt`: ตรวจสอบการดึงแชท YouTube
-*   `log.txt`: รวม Log ทั้งหมดในรูปแบบ DEBUG (ละเอียดที่สุด)
+### CLI
 
----
+ตั้งค่าใน `config.ini` แล้วรัน:
 
-## 🤖 เครื่องมือสำหรับแจ้งบัคให้ AI (`ai_diagnostic.py`)
+```bash
+python start_cli.py
+```
 
-หากพบปัญหาและต้องการให้ AI ช่วยแก้ไข ให้ทำตามนี้:
+## ไฟล์ log
 
-1.  รันคำสั่ง: `python ai_diagnostic.py`
-2.  ไฟล์ชื่อ `ai_report.txt` จะถูกสร้างขึ้น
-3.  **ก๊อปปี้เนื้อหาในไฟล์นั้น** ส่งให้ AI วิเคราะห์ได้ทันที!
+ไฟล์ log จะอยู่ในโฟลเดอร์ `logs/`:
 
----
+- `log.txt`
+- `youtube.txt`
+- `twitch.txt`
+- `tiktok.txt`
 
-## 💡 ข้อแนะนำรายแพลตฟอร์ม
+## หมายเหตุรายแพลตฟอร์ม
 
-### 🔵 Facebook
-*   **ปัญหาที่พบบ่อย**: "Unable to set datr cookie" (โดน Facebook บล็อก)
-*   **วิธีแก้**: รอประมาณ 10-15 นาทีแล้วลองใหม่ หรือลองเปลี่ยน IP อินเทอร์เน็ต
+- `YouTube`: รองรับทั้ง URL และ Video ID
+- `Twitch`: ใช้ anonymous IRC login จึงไม่ต้องใช้ API key
+- `TikTok`: อาจมี reconnect หรือ error จากไลบรารี `TikTokLive` เป็นครั้งคราว ระบบจะพยายามเชื่อมต่อใหม่ให้อัตโนมัติ
 
-### ⚫ TikTok
-*   **ปัญหาที่พบบ่อย**: "get_type" Error (บัคภายใน Library)
-*   **วิธีแก้**: ไม่ต้องทำอะไร ระบบจะทำการ **Auto-Retry** (เชื่อมต่อใหม่) ให้เองทุก 10 วินาทีจนกว่าจะติด
+## โครงสร้างหลัก
 
-### 🟣 Twitch
-*   **ความเสถียร**: สูงที่สุด รองรับการดึงแชทแบบไม่ต้องใช้ API Key
-
----
-
-## 🛠 ข้อมูลสำหรับนักพัฒนา (Structure)
-
-*   `engine.py`: ตัวควบคุมหลัก
-*   `*_collector.py`: โมดูลแยกตามแพลตฟอร์ม
-*   `FIX_LOG.md`: ประวัติการแก้บัคที่ผ่านมา
+- `start_gui.py`: โปรแกรมหน้าจอ
+- `start_cli.py`: โปรแกรมแบบ command line
+- `core/tts_engine.py`: ตัวควบคุมหลัก
+- `core/yt_chat.py`: ตัวดึงแชท YouTube
+- `core/twitch_chat.py`: ตัวดึงแชท Twitch
+- `core/tiktok_chat.py`: ตัวดึงแชท TikTok
