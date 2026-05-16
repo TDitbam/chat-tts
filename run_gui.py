@@ -4,8 +4,12 @@ import sys
 import os
 import time
 import logging
-from engine import ChatTTSEngine
-from logger import get_logger, logger as base_logger
+
+# Add scripts directory to path
+sys.path.append(os.path.join(os.path.dirname(__file__), 'scripts'))
+
+from scripts.engine import ChatTTSEngine
+from scripts.logger import get_logger, logger as base_logger
 
 logger = get_logger("GUI")
 CONFIG_FILE = "config.ini"
@@ -55,14 +59,30 @@ class ChatTTSGui(ctk.CTk):
         self.main_frame = ctk.CTkScrollableFrame(self, width=550, height=450)
         self.main_frame.pack(pady=10, padx=20, fill="both", expand=True)
 
-        # Platform Toggles Section
+        self._init_vars()
+        self._setup_youtube_section()
+        self._setup_twitch_section()
+        self._setup_tiktok_section()
+        self._setup_general_settings()
+
+        self.label_status = ctk.CTkLabel(self, text="Status: Stopped", text_color="red")
+        self.label_status.pack(pady=5)
+
+        self.btn_toggle = ctk.CTkButton(self, text="Start System", command=self.toggle_system, fg_color="green", hover_color="#006400")
+        self.btn_toggle.pack(pady=10)
+
+        self.log_box = ctk.CTkTextbox(self, height=150, width=550)
+        self.log_box.pack(pady=(10, 20))
+        self.log_box.configure(state="disabled")
+
+    def _init_vars(self):
         self.yt_enabled = ctk.StringVar(value=self.config.get("settings", "yt_enabled", fallback="True"))
-        self.fb_enabled = ctk.StringVar(value=self.config.get("settings", "fb_enabled", fallback="False"))
         self.tw_enabled = ctk.StringVar(value=self.config.get("settings", "tw_enabled", fallback="False"))
         self.tk_enabled = ctk.StringVar(value=self.config.get("settings", "tk_enabled", fallback="False"))
         self.auto_translate = ctk.StringVar(value=self.config.get("settings", "auto_translate", fallback="False"))
+        self.voice_var = ctk.StringVar(value=self.config.get("settings", "VOICE", fallback="th-TH-PremwadeeNeural"))
 
-        # --- YouTube Section ---
+    def _setup_youtube_section(self):
         self.yt_frame = ctk.CTkFrame(self.main_frame)
         self.yt_frame.pack(pady=5, padx=10, fill="x")
         ctk.CTkCheckBox(self.yt_frame, text="YouTube Enabled", variable=self.yt_enabled, onvalue="True", offvalue="False").pack(side="left", padx=10)
@@ -70,15 +90,7 @@ class ChatTTSGui(ctk.CTk):
         self.entry_yt.insert(0, self.config.get("settings", "YOUTUBE_VIDEO_ID", fallback=""))
         self.entry_yt.pack(side="right", padx=10, pady=5)
 
-        # --- Facebook Section ---
-        self.fb_frame = ctk.CTkFrame(self.main_frame)
-        self.fb_frame.pack(pady=5, padx=10, fill="x")
-        ctk.CTkCheckBox(self.fb_frame, text="Facebook Enabled", variable=self.fb_enabled, onvalue="True", offvalue="False").pack(side="left", padx=10)
-        self.entry_fb = ctk.CTkEntry(self.fb_frame, placeholder_text="Facebook Live URL", width=250)
-        self.entry_fb.insert(0, self.config.get("settings", "fb_url", fallback=""))
-        self.entry_fb.pack(side="right", padx=10, pady=5)
-
-        # --- Twitch Section ---
+    def _setup_twitch_section(self):
         self.tw_frame = ctk.CTkFrame(self.main_frame)
         self.tw_frame.pack(pady=5, padx=10, fill="x")
         ctk.CTkCheckBox(self.tw_frame, text="Twitch Enabled", variable=self.tw_enabled, onvalue="True", offvalue="False").pack(side="left", padx=10)
@@ -86,7 +98,7 @@ class ChatTTSGui(ctk.CTk):
         self.entry_tw.insert(0, self.config.get("settings", "tw_channel", fallback=""))
         self.entry_tw.pack(side="right", padx=10, pady=5)
 
-        # --- TikTok Section ---
+    def _setup_tiktok_section(self):
         self.tk_frame = ctk.CTkFrame(self.main_frame)
         self.tk_frame.pack(pady=5, padx=10, fill="x")
         ctk.CTkCheckBox(self.tk_frame, text="TikTok Enabled", variable=self.tk_enabled, onvalue="True", offvalue="False").pack(side="left", padx=10)
@@ -94,14 +106,13 @@ class ChatTTSGui(ctk.CTk):
         self.entry_tk.insert(0, self.config.get("settings", "tk_username", fallback=""))
         self.entry_tk.pack(side="right", padx=10, pady=5)
 
-        # --- General Settings ---
+    def _setup_general_settings(self):
         self.gen_frame = ctk.CTkFrame(self.main_frame)
         self.gen_frame.pack(pady=10, padx=10, fill="x")
         
         ctk.CTkCheckBox(self.gen_frame, text="Auto-Translate (แปลภาษาอัตโนมัติ)", variable=self.auto_translate, onvalue="True", offvalue="False").grid(row=0, column=0, columnspan=2, padx=10, pady=5, sticky="w")
 
         ctk.CTkLabel(self.gen_frame, text="Voice:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        self.voice_var = ctk.StringVar(value=self.config.get("settings", "VOICE", fallback="th-TH-PremwadeeNeural"))
         self.voice_menu = ctk.CTkOptionMenu(self.gen_frame, values=["th-TH-PremwadeeNeural", "th-TH-NiwatNeural"], variable=self.voice_var)
         self.voice_menu.grid(row=1, column=1, padx=10, pady=5, sticky="w")
 
@@ -115,25 +126,13 @@ class ChatTTSGui(ctk.CTk):
         self.entry_max_delay.insert(0, self.config.get("settings", "max_delay", fallback="2.0"))
         self.entry_max_delay.grid(row=3, column=1, padx=10, pady=5, sticky="w")
 
-        self.label_status = ctk.CTkLabel(self, text="Status: Stopped", text_color="red")
-        self.label_status.pack(pady=5)
-
-        self.btn_toggle = ctk.CTkButton(self, text="Start System", command=self.toggle_system, fg_color="green", hover_color="#006400")
-        self.btn_toggle.pack(pady=10)
-
-        self.log_box = ctk.CTkTextbox(self, height=150, width=550)
-        self.log_box.pack(pady=(10, 20))
-        self.log_box.configure(state="disabled")
-
     def save_settings(self):
         if not self.config.has_section("settings"): self.config.add_section("settings")
         self.config.set("settings", "yt_enabled", self.yt_enabled.get())
-        self.config.set("settings", "fb_enabled", self.fb_enabled.get())
         self.config.set("settings", "tw_enabled", self.tw_enabled.get())
         self.config.set("settings", "tk_enabled", self.tk_enabled.get())
         self.config.set("settings", "auto_translate", self.auto_translate.get())
         self.config.set("settings", "YOUTUBE_VIDEO_ID", self.entry_yt.get())
-        self.config.set("settings", "fb_url", self.entry_fb.get())
         self.config.set("settings", "tw_channel", self.entry_tw.get())
         self.config.set("settings", "tk_username", self.entry_tk.get())
         self.config.set("settings", "VOICE", self.voice_var.get())
@@ -147,8 +146,6 @@ class ChatTTSGui(ctk.CTk):
             conf = {
                 "yt_enabled": self.yt_enabled.get(),
                 "yt_id": self.entry_yt.get(),
-                "fb_enabled": self.fb_enabled.get(),
-                "fb_url": self.entry_fb.get(),
                 "tw_enabled": self.tw_enabled.get(),
                 "tw_channel": self.entry_tw.get(),
                 "tk_enabled": self.tk_enabled.get(),

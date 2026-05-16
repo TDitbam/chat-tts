@@ -1,9 +1,8 @@
 pytchat
 edge-tts
-playsound3
+pygame
 customtkinter
 pyinstaller
-chat-downloader
 gTTS
 TikTokLive
 deep-translator
