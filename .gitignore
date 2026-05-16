@@ -11,6 +11,7 @@ temp_audio/
 msg_queue/
 config.ini
 logs/
+build/
 
 # OS
 .DS_Store
