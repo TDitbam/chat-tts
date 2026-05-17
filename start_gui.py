@@ -10,7 +10,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'core'))
 from core.tts_engine import ChatTTSEngine
 from core.app_logger import get_logger, logger as base_logger
 
-
 logger = get_logger("GUI")
 CONFIG_FILE = "config.ini"
 
