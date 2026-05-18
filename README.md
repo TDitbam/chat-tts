@@ -1,99 +1,35 @@
 # Chat TTS Multi-Platform
 
-โปรเจกต์อ่านข้อความจากไลฟ์แชทแล้วแปลงเป็นเสียงพูดภาษาไทยแบบอัตโนมัติ รองรับการดึงข้อความจาก YouTube, Twitch และ TikTok พร้อมระบบแปลเป็นไทยก่อนอ่าน และ fallback ไปใช้ `gTTS` หาก `edge-tts` ใช้งานไม่ได้
+โปรเจกต์แปลงข้อความจากไลฟ์แชท (Live Chat) เป็นเสียงพูดภาษาไทยแบบอัตโนมัติ รองรับการดึงข้อมูลสตรีมมิงสดจากแพลตฟอร์มหลัก พร้อมระบบแปลภาษาล่วงหน้าและระบบสำรองความปลอดภัย (Fallback Engine) เมื่อเกิดข้อผิดพลาด
 
-## จุดเด่น
+---
 
-- รองรับ `YouTube Live`, `Twitch Chat`, และ `TikTok Live`
-- มีทั้งโหมด `GUI` (`customtkinter`) และ `CLI`
-- แปลข้อความต่างภาษาเป็นไทยอัตโนมัติด้วย `deep-translator`
-- ใช้ `edge-tts` เป็นตัวหลัก และ fallback ไป `gTTS`
-- มี queue แยกข้อความ/เสียง, duplicate filter และ auto-reconnect
-- แยก log ตามแพลตฟอร์มไว้ในโฟลเดอร์ `logs/`
+## 🚀 จุดเด่นของโปรเจกต์
 
-## สถานะโปรเจกต์ปัจจุบัน
+*   **Multi-Platform Support:** ดึงแชทสดจาก **YouTube Live**, **Twitch Chat** และ **TikTok Live** ได้พร้อมกัน
+*   **Dual UI Mode:** รองรับการใช้งานทั้งรูปแบบหน้าต่างโปรแกรม (**GUI** พัฒนาด้วย `customtkinter`) และสั่งการผ่านคอนโซล (**CLI**)
+*   **Auto-Translation:** แปลข้อความต่างประเทศเป็นภาษาไทยโดยอัตโนมัติด้วย `deep-translator` ก่อนเริ่มอ่านเสียง
+*   **Smart TTS Engine:** ใช้เสียงคุณภาพสูงจาก `edge-tts` เป็นหลัก และสลับไปใช้ `gTTS` ทันทีโดยอัตโนมัติหากระบบหลักใช้งานไม่ได้
+*   **Robust Architecture:** มีระบบจัดการคิวข้อความและเสียง (Queue System), ระบบกรองข้อความซ้ำ (Duplicate Filter) และระบบเชื่อมต่อใหม่อัตโนมัติ (Auto-Reconnect)
+*   **Structured Logs:** แยกไฟล์บันทึกประวัติและการทำงาน (Log) อย่างเป็นระเบียบตามรายแพลตฟอร์มไว้ในโฟลเดอร์ `logs/`
 
-entrypoints ที่ใช้กับ source code ในรีโปนี้ตอนนี้คือ:
+---
 
-- `start_gui.py`
-- `start_cli.py`
+## 📌 สถานะโปรเจกต์ปัจจุบัน
 
-เอกสารบางส่วนใน `docs/` เป็นโน้ตจากโครงสร้างก่อนหน้า จึงควรยึด `README.md` ที่ root และไฟล์ `start_gui.py` / `start_cli.py` เป็นหลัก
+> ⚠️ **ข้อควรรู้ก่อนใช้งาน:** 
+> เอกสารบางส่วนในโฟลเดอร์ `docs/` อาจเป็นบันทึกโครงสร้างระบบในเวอร์ชันเก่า **โปรดยึดข้อมูลจากไฟล์ `README.md` นี้ ร่วมกับไฟล์หลักที่ root ของโปรเจกต์เป็นสำคัญ**
 
-## การติดตั้ง
+จุดเข้าใช้งานหลัก (Entrypoints) ของซอร์สโค้ดในปัจจุบันประกอบด้วย:
+*   `start_gui.py` — สำหรับรันระบบผ่านหน้าจอ Graphic Interface
+*   `start_cli.py` — สำหรับรันระบบผ่าน Command Line
 
-ต้องใช้ Python 3.10 ขึ้นไป และอินเทอร์เน็ตระหว่างใช้งาน
+---
 
+## 🛠️ การติดตั้ง
+
+**ความต้องการของระบบ:** Python 3.10 ขึ้นไป และจำเป็นต้องเชื่อมต่ออินเทอร์เน็ตระหว่างใช้งาน
+
+ติดตั้งไลบรารีที่จำเป็นทั้งหมดผ่านคำสั่ง:
 ```bash
 pip install -r requirements.txt
-```
-
-## การใช้งาน
-
-### GUI
-
-```bash
-python start_gui.py
-```
-
-1. เปิดแพลตฟอร์มที่ต้องการผ่าน checkbox
-2. กรอกค่า stream/channel/username
-3. ตั้งค่าเสียง, delay, และ auto-translate
-4. กด `START SYSTEM`
-
-### CLI
-
-แก้ค่าใน `config.ini` แล้วรัน:
-
-```bash
-python start_cli.py
-```
-
-ถ้าเปิด YouTube ไว้แต่ยังไม่ได้ใส่ `YOUTUBE_VIDEO_ID` ระบบจะถามค่าใน console
-
-## ค่าคอนฟิกหลัก
-
-คีย์สำคัญใน `config.ini`:
-
-- `yt_enabled`, `YOUTUBE_VIDEO_ID`
-- `tw_enabled`, `tw_channel`
-- `tk_enabled`, `tk_username`
-- `VOICE`
-- `auto_translate`
-- `delay_per_char`
-- `max_delay`
-
-หมายเหตุ: ใน `config.ini` หรือไฟล์เก่าอาจยังมีคีย์ `fb_*` ค้างอยู่ แต่ engine ปัจจุบันใน `core/` ไม่ได้ใช้งาน Facebook collector แล้ว
-
-## โครงสร้างหลัก
-
-```text
-.
-|-- start_gui.py
-|-- start_cli.py
-|-- core/
-|   |-- tts_engine.py
-|   |-- yt_chat.py
-|   |-- twitch_chat.py
-|   `-- tiktok_chat.py
-|-- config.ini
-|-- logs/
-`-- docs/
-```
-
-## Log และการดีบัก
-
-ระบบจะสร้าง log ไว้ใน `logs/` เช่น:
-
-- `logs/log.txt`
-- `logs/youtube.txt`
-- `logs/twitch.txt`
-- `logs/tiktok.txt`
-
-ถ้ามีปัญหาเรื่องการเชื่อมต่อหรือเสียงไม่ออก ให้เริ่มตรวจจากไฟล์เหล่านี้ก่อน
-
-## หมายเหตุ
-
-- TikTok ใช้ไลบรารี `TikTokLive` ซึ่งอาจมีอาการ reconnect หรือ error จากภายในไลบรารีได้เป็นครั้งคราว
-- Twitch ใช้วิธี anonymous IRC login จึงไม่ต้องใช้ API key
-- ในรีโปมีไฟล์ build สำหรับ Windows อยู่แล้วใน `dist/` และ zip ที่ root สำหรับการแจกจ่าย
