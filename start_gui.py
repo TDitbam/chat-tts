@@ -49,6 +49,32 @@ class ChatTTSGui(ctk.CTk):
 
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         logger.info("GUI Initialized")
+        
+        # Real-time listeners
+        self._setup_listeners()
+
+    def _setup_listeners(self):
+        """Setup listeners for real-time config updates."""
+        for var in [self.auto_translate, self.profanity_enabled, self.voice_var]:
+            var.trace_add("write", lambda *args: self.apply_realtime_config())
+            
+        # Add focus-out listeners for Entry widgets
+        self.entry_delay_char.bind("<FocusOut>", lambda e: self.apply_realtime_config())
+        self.entry_max_delay.bind("<FocusOut>", lambda e: self.apply_realtime_config())
+        self.entry_delay_char.bind("<Return>", lambda e: self.apply_realtime_config())
+        self.entry_max_delay.bind("<Return>", lambda e: self.apply_realtime_config())
+
+    def apply_realtime_config(self):
+        """Apply current GUI settings to the engine in real-time."""
+        if self.engine.is_running:
+            conf = {
+                "voice": self.voice_var.get(),
+                "delay_per_char": self.entry_delay_char.get(),
+                "max_delay": self.entry_max_delay.get(),
+                "auto_translate": self.auto_translate.get(),
+                "profanity_enabled": self.profanity_enabled.get()
+            }
+            self.engine.update_config(conf)
 
     def create_widgets(self):
         self.label_title = ctk.CTkLabel(self, text="Chat TTS Multi-Platform", font=("Helvetica", 24, "bold"))

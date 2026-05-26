@@ -272,3 +272,22 @@ class ChatTTSEngine:
         self.is_running = False
         self.threads = []
         logger.info("Engine stopped")
+
+    def update_config(self, config_dict: Dict[str, Any]):
+        """Update engine configuration in real-time."""
+        try:
+            if "voice" in config_dict:
+                self.voice = config_dict["voice"]
+            if "delay_per_char" in config_dict:
+                self.delay_per_char = float(config_dict.get("delay_per_char", 0.03))
+            if "max_delay" in config_dict:
+                self.max_delay = float(config_dict.get("max_delay", 2.0))
+            if "auto_translate" in config_dict:
+                self.auto_translate = config_dict["auto_translate"] == "True"
+            if "profanity_enabled" in config_dict:
+                self.profanity_enabled = config_dict["profanity_enabled"] == "True"
+                if self.profanity_enabled:
+                    self._load_profanity_list()
+            logger.info("Engine configuration updated in real-time.")
+        except Exception as e:
+            logger.error(f"Failed to update config in real-time: {e}")
