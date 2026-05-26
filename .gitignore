@@ -10,8 +10,14 @@ ENV/
 temp_audio/
 msg_queue/
 config.ini
+bad_words.txt
 logs/
 build/
+dist/
+*.spec
+*.zip
+*.rar
+
 
 # OS
 .DS_Store

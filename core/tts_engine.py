@@ -38,7 +38,25 @@ class ChatTTSEngine:
         self.auto_translate = False
         self.translator = GoogleTranslator(source='auto', target='th')
         
+        # Profanity Filter
+        self.profanity_enabled = False
+        self.profanity_list = []
+        self.profanity_file = "bad_words.txt"
+        self._load_profanity_list()
+        
         self._init_mixer()
+
+    def _load_profanity_list(self):
+        """Load profanity list from file."""
+        if os.path.exists(self.profanity_file):
+            try:
+                with open(self.profanity_file, "r", encoding="utf-8") as f:
+                    self.profanity_list = [line.strip().lower() for line in f if line.strip()]
+                logger.info(f"Loaded {len(self.profanity_list)} profanity words.")
+            except Exception as e:
+                logger.error(f"Failed to load profanity list: {e}")
+        else:
+            self.profanity_list = []
 
     def _ensure_directories(self):
         """Create necessary directories if they don't exist."""
@@ -84,6 +102,14 @@ class ChatTTSEngine:
             
         author = data.get("author", "Unknown")
         message = data.get("message", "")
+
+        # Profanity Filter
+        if self.profanity_enabled:
+            msg_lower = message.lower()
+            for word in self.profanity_list:
+                if word in msg_lower:
+                    logger.warning(f"Message from {author} blocked by profanity filter.")
+                    return None
 
         # Length Filter
         if len(message) > 200:
@@ -193,10 +219,12 @@ class ChatTTSEngine:
         self.delay_per_char = float(config_dict.get("delay_per_char", 0.03))
         self.max_delay = float(config_dict.get("max_delay", 2.0))
         self.auto_translate = config_dict.get("auto_translate") == "True"
+        self.profanity_enabled = config_dict.get("profanity_enabled") == "True"
         
         def run_engine():
             try:
                 self._cleanup_temp_files()
+                self._load_profanity_list()
                 
                 # Core Threads
                 self.threads = [

@@ -27,7 +27,8 @@ def main():
         "voice": config.get("settings", "VOICE", fallback="th-TH-PremwadeeNeural"),
         "delay_per_char": config.get("settings", "delay_per_char", fallback="0.03"),
         "max_delay": config.get("settings", "max_delay", fallback="2.0"),
-        "auto_translate": config.get("settings", "auto_translate", fallback="False")
+        "auto_translate": config.get("settings", "auto_translate", fallback="False"),
+        "profanity_enabled": config.get("settings", "profanity_enabled", fallback="False")
     }
     
     if conf["yt_enabled"] == "True" and not conf["yt_id"]:

@@ -60,6 +60,7 @@ class ChatTTSGui(ctk.CTk):
         
         self.tab_connect = self.tabview.add("Connections")
         self.tab_settings = self.tabview.add("System Settings")
+        self.tab_filter = self.tabview.add("Profanity Filter")
 
         self._init_vars()
         
@@ -70,6 +71,9 @@ class ChatTTSGui(ctk.CTk):
         
         # --- Settings Tab ---
         self._setup_general_settings(self.tab_settings)
+
+        # --- Filter Tab ---
+        self._setup_filter_tab(self.tab_filter)
 
         # Bottom Area
         self.label_status = ctk.CTkLabel(self, text="Status: Stopped", text_color="red", font=("Helvetica", 14, "bold"))
@@ -89,6 +93,7 @@ class ChatTTSGui(ctk.CTk):
         self.tw_enabled = ctk.StringVar(value=self.config.get("settings", "tw_enabled", fallback="False"))
         self.tk_enabled = ctk.StringVar(value=self.config.get("settings", "tk_enabled", fallback="False"))
         self.auto_translate = ctk.StringVar(value=self.config.get("settings", "auto_translate", fallback="False"))
+        self.profanity_enabled = ctk.StringVar(value=self.config.get("settings", "profanity_enabled", fallback="False"))
         self.voice_var = ctk.StringVar(value=self.config.get("settings", "VOICE", fallback="th-TH-PremwadeeNeural"))
 
     def _setup_youtube_section(self, parent):
@@ -152,18 +157,48 @@ class ChatTTSGui(ctk.CTk):
         self.entry_max_delay.insert(0, self.config.get("settings", "max_delay", fallback="2.0"))
         self.entry_max_delay.grid(row=4, column=1, padx=20, pady=10, sticky="w")
 
+    def _setup_filter_tab(self, parent):
+        frame = ctk.CTkFrame(parent)
+        frame.pack(pady=20, padx=20, fill="both", expand=True)
+        
+        ctk.CTkLabel(frame, text="Profanity Filter Settings (ระบบกรองคำหยาบ)", font=("Helvetica", 14, "bold")).pack(pady=10)
+        
+        ctk.CTkCheckBox(frame, text="Enable Profanity Filter (เปิดระบบกรองคำหยาบ)", variable=self.profanity_enabled, onvalue="True", offvalue="False").pack(pady=10, padx=20, anchor="w")
+        
+        ctk.CTkLabel(frame, text="Blocked Words (One per line):").pack(pady=(10, 0), padx=20, anchor="w")
+        self.textbox_filter = ctk.CTkTextbox(frame, height=200)
+        self.textbox_filter.pack(pady=10, padx=20, fill="both", expand=True)
+        
+        # Load existing words
+        if os.path.exists("bad_words.txt"):
+            try:
+                with open("bad_words.txt", "r", encoding="utf-8") as f:
+                    self.textbox_filter.insert("1.0", f.read())
+            except:
+                pass
+
     def save_settings(self):
         if not self.config.has_section("settings"): self.config.add_section("settings")
         self.config.set("settings", "yt_enabled", self.yt_enabled.get())
         self.config.set("settings", "tw_enabled", self.tw_enabled.get())
         self.config.set("settings", "tk_enabled", self.tk_enabled.get())
         self.config.set("settings", "auto_translate", self.auto_translate.get())
+        self.config.set("settings", "profanity_enabled", self.profanity_enabled.get())
         self.config.set("settings", "YOUTUBE_VIDEO_ID", self.entry_yt.get())
         self.config.set("settings", "tw_channel", self.entry_tw.get())
         self.config.set("settings", "tk_username", self.entry_tk.get())
         self.config.set("settings", "VOICE", self.voice_var.get())
         self.config.set("settings", "delay_per_char", self.entry_delay_char.get())
         self.config.set("settings", "max_delay", self.entry_max_delay.get())
+        
+        # Save bad words
+        try:
+            words = self.textbox_filter.get("1.0", "end-1c")
+            with open("bad_words.txt", "w", encoding="utf-8") as f:
+                f.write(words)
+        except Exception as e:
+            logger.error(f"Failed to save bad_words.txt: {e}")
+
         with open(CONFIG_FILE, "w", encoding="utf-8") as f: self.config.write(f)
 
     def toggle_system(self):
@@ -179,7 +214,8 @@ class ChatTTSGui(ctk.CTk):
                 "voice": self.voice_var.get(),
                 "delay_per_char": self.entry_delay_char.get(),
                 "max_delay": self.entry_max_delay.get(),
-                "auto_translate": self.auto_translate.get()
+                "auto_translate": self.auto_translate.get(),
+                "profanity_enabled": self.profanity_enabled.get()
             }
             self.engine.start(conf)
             self.btn_toggle.configure(text="Stop System", fg_color="red", hover_color="#8B0000")
