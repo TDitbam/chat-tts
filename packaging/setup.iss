@@ -25,6 +25,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "dist\ChatTTS.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\ChatTTS-CLI.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\manual_th.md"; DestDir: "{app}\docs"; Flags: ignoreversion
@@ -32,8 +33,10 @@ Source: "..\docs\ai_recommendations.md"; DestDir: "{app}\docs"; Flags: ignorever
 
 [Icons]
 Name: "{group}\Chat TTS Multi-Platform"; Filename: "{app}\ChatTTS.exe"
+Name: "{group}\Chat TTS CLI Mode"; Filename: "{app}\ChatTTS-CLI.exe"
 Name: "{group}\{cm:UninstallProgram,Chat TTS Multi-Platform}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Chat TTS Multi-Platform"; Filename: "{app}\ChatTTS.exe"; Tasks: desktopicon
+Name: "{autodesktop}\Chat TTS CLI"; Filename: "{app}\ChatTTS-CLI.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\ChatTTS.exe"; Description: "{cm:LaunchProgram,Chat TTS Multi-Platform}"; Flags: nowait postinstall skipifsilent

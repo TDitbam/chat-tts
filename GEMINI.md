@@ -3,9 +3,11 @@
 This project is a multi-platform Chat-to-Speech system. To maintain a clean and scalable codebase, all AI assistants must follow these rules.
 
 ## 1. Directory Structure
-*   **Root:** Only entry point scripts (`start_cli.py`, `start_gui.py`) and configuration files should be here.
-*   **`core/`:** All core logic, engine, and platform-specific collectors MUST live here.
-*   **`docs/`:** Documentation files (.md, .txt).
+*   **Root:** Entry point scripts (`start_cli.py`, `start_gui.py`) and configuration files (`config.ini`).
+*   **`core/`:** Core engine and logic (`tts_engine.py`, `app_logger.py`).
+*   **`core/collectors/`:** Platform-specific chat collectors (YouTube, Twitch, TikTok).
+*   **`packaging/`:** Build scripts (`build.cmd`) and installer configurations (`setup.iss`).
+*   **`docs/`:** Documentation and release notes (`release_notes/`).
 *   **`logs/`:** Log files.
 *   **`msg_queue/` / `temp_audio/`:** Transient data directories.
 
