@@ -13,15 +13,16 @@ from pygame import mixer
 from gtts import gTTS
 
 from .app_logger import get_logger
-from .yt_chat import youtube_collector
-from .twitch_chat import twitch_collector
-from .tiktok_chat import tiktok_collector
+from .collectors.yt_chat import youtube_collector
+from .collectors.twitch_chat import twitch_collector
+from .collectors.tiktok_chat import tiktok_collector
 
 logger = get_logger("Engine")
 
 class ChatTTSEngine:
     def __init__(self):
         self.is_running = False
+        self.current_session_id = 0
         self.msg_queue = queue.Queue(maxsize=100)
         self.audio_queue = queue.Queue(maxsize=100)
         self.seen_messages = set()
@@ -45,6 +46,17 @@ class ChatTTSEngine:
         self._load_profanity_list()
         
         self._init_mixer()
+
+    def _clear_queues(self):
+        """Empty both message and audio queues."""
+        while not self.msg_queue.empty():
+            try: self.msg_queue.get_nowait()
+            except queue.Empty: break
+            
+        while not self.audio_queue.empty():
+            try: self.audio_queue.get_nowait()
+            except queue.Empty: break
+        logger.info("Queues cleared.")
 
     def _load_profanity_list(self):
         """Load profanity list from file."""
@@ -78,9 +90,10 @@ class ChatTTSEngine:
             if os.path.exists(d):
                 for f in os.listdir(d):
                     try: 
+                        # Mandatory for Windows: check if it's an mp3 and ensure mixer is unloaded elsewhere
                         os.remove(os.path.join(d, f))
-                    except: 
-                        pass
+                    except Exception as e: 
+                        logger.debug(f"Could not remove {f}: {e}")
 
     def extract_video_id(self, url_or_id: str) -> str:
         """Extract YouTube video ID from URL or return raw ID."""
@@ -128,6 +141,7 @@ class ChatTTSEngine:
         # Translation
         if self.auto_translate:
             try:
+                # Basic Thai detection
                 if not any('\u0e00' <= char <= '\u0e7f' for char in message):
                     translated = self.translator.translate(message)
                     logger.info(f"Translated: {message} -> {translated}")
@@ -151,13 +165,13 @@ class ChatTTSEngine:
                 logger.error(f"gTTS fallback also failed: {ge}")
                 raise ge
 
-    async def generator_task(self):
+    async def generator_task(self, session_id: int):
         """Main generator loop: process messages and generate audio."""
-        logger.info(f"Generator started: {self.voice}")
-        while self.is_running:
+        logger.info(f"Generator started (Session: {session_id}, Voice: {self.voice})")
+        while self.is_running and session_id == self.current_session_id:
             try:
                 try:
-                    data = self.msg_queue.get(timeout=0.1)
+                    data = self.msg_queue.get(timeout=0.2)
                 except queue.Empty:
                     continue
 
@@ -165,28 +179,35 @@ class ChatTTSEngine:
                 if not processed_text:
                     continue
 
+                logger.info(f"Processing: {processed_text}")
                 path = os.path.join(self.audio_dir, f"{int(time.time()*1000)}.mp3")
                 
                 try:
                     await self._generate_audio(processed_text, path)
-                    self.audio_queue.put((path, len(processed_text)), timeout=1.0)
+                    # Double check session before putting to queue
+                    if self.is_running and session_id == self.current_session_id:
+                        self.audio_queue.put((path, len(processed_text)), timeout=1.0)
+                    else:
+                        if os.path.exists(path): os.remove(path)
                 except queue.Full:
                     logger.warning("Audio queue full, dropping message.")
                     if os.path.exists(path): os.remove(path)
-                except Exception:
+                except Exception as ge:
+                    logger.error(f"Audio Generation Error: {ge}")
                     continue
 
             except Exception as e:
                 logger.error(f"Generator Error: {e}")
                 await asyncio.sleep(1)
+        logger.info(f"Generator stopped (Session: {session_id})")
 
-    def player_loop(self):
+    def player_loop(self, session_id: int):
         """Main player loop: play generated audio files."""
-        logger.info("Player started")
-        while self.is_running:
+        logger.info(f"Player started (Session: {session_id})")
+        while self.is_running and session_id == self.current_session_id:
             try:
                 try:
-                    path, char_count = self.audio_queue.get(timeout=0.1)
+                    path, char_count = self.audio_queue.get(timeout=0.2)
                 except queue.Empty:
                     continue
 
@@ -195,10 +216,11 @@ class ChatTTSEngine:
                         logger.info(f"Playing: {path}")
                         mixer.music.load(path)
                         mixer.music.play()
-                        while mixer.music.get_busy() and self.is_running:
+                        while mixer.music.get_busy() and self.is_running and session_id == self.current_session_id:
                             time.sleep(0.1)
                         mixer.music.unload()
                         
+                        # Apply delay per character
                         time.sleep(min(char_count * self.delay_per_char, self.max_delay))
                     except Exception as e: 
                         logger.error(f"Play Error: {e}")
@@ -208,34 +230,44 @@ class ChatTTSEngine:
                         except: pass
             except Exception as e: 
                 logger.error(f"Player Loop Error: {e}")
+        logger.info(f"Player stopped (Session: {session_id})")
 
     def start(self, config_dict: Dict[str, Any]):
         """Initialize and start all engine components and collectors."""
-        if self.is_running: return
+        if self.is_running: 
+            self.stop()
+            time.sleep(0.2) # Small cooldown for old threads to see the flag
+            
         self.is_running = True
+        self.current_session_id += 1
+        current_sid = self.current_session_id
         
         # Load Config
         self.voice = config_dict.get("voice", "th-TH-PremwadeeNeural")
         self.delay_per_char = float(config_dict.get("delay_per_char", 0.03))
         self.max_delay = float(config_dict.get("max_delay", 2.0))
-        self.auto_translate = config_dict.get("auto_translate") == "True"
-        self.profanity_enabled = config_dict.get("profanity_enabled") == "True"
+        self.auto_translate = str(config_dict.get("auto_translate")) == "True"
+        self.profanity_enabled = str(config_dict.get("profanity_enabled")) == "True"
         
+        logger.info(f"Starting Engine Session {current_sid}...")
+        logger.info(f"Config: Voice={self.voice}, AutoTranslate={self.auto_translate}, Profanity={self.profanity_enabled}")
+
         def run_engine():
             try:
+                self._clear_queues()
                 self._cleanup_temp_files()
                 self._load_profanity_list()
                 
                 # Core Threads
                 self.threads = [
-                    threading.Thread(target=lambda: asyncio.run(self.generator_task()), daemon=True),
-                    threading.Thread(target=self.player_loop, daemon=True)
+                    threading.Thread(target=lambda: asyncio.run(self.generator_task(current_sid)), daemon=True),
+                    threading.Thread(target=lambda: self.player_loop(current_sid), daemon=True)
                 ]
 
-                # Collectors
-                is_running_check = lambda: self.is_running
+                # Collectors check session as well
+                is_running_check = lambda: self.is_running and current_sid == self.current_session_id
                 
-                if config_dict.get("yt_enabled") == "True" and config_dict.get("yt_id"):
+                if str(config_dict.get("yt_enabled")) == "True" and config_dict.get("yt_id"):
                     vid = self.extract_video_id(config_dict.get("yt_id", ""))
                     self.threads.append(threading.Thread(
                         target=youtube_collector, 
@@ -243,7 +275,7 @@ class ChatTTSEngine:
                         daemon=True
                     ))
                     
-                if config_dict.get("tw_enabled") == "True" and config_dict.get("tw_channel"):
+                if str(config_dict.get("tw_enabled")) == "True" and config_dict.get("tw_channel"):
                     channel = config_dict.get("tw_channel", "")
                     self.threads.append(threading.Thread(
                         target=twitch_collector, 
@@ -251,7 +283,7 @@ class ChatTTSEngine:
                         daemon=True
                     ))
 
-                if config_dict.get("tk_enabled") == "True" and config_dict.get("tk_username"):
+                if str(config_dict.get("tk_enabled")) == "True" and config_dict.get("tk_username"):
                     username = config_dict.get("tk_username", "")
                     self.threads.append(threading.Thread(
                         target=tiktok_collector, 
@@ -260,7 +292,7 @@ class ChatTTSEngine:
                     ))
 
                 for t in self.threads: t.start()
-                logger.info(f"Engine started with {len(self.threads)-2} collectors")
+                logger.info(f"Engine session {current_sid} started with {len(self.threads)-2} collectors")
             except Exception as e:
                 logger.error(f"Failed to start engine: {e}\n{traceback.format_exc()}")
                 self.is_running = False
@@ -270,8 +302,13 @@ class ChatTTSEngine:
     def stop(self):
         """Stop all engine components."""
         self.is_running = False
+        self.current_session_id += 1 # Invalidate current session
         self.threads = []
-        logger.info("Engine stopped")
+        try:
+            mixer.music.stop()
+            mixer.music.unload()
+        except: pass
+        logger.info("Engine stop signal sent.")
 
     def update_config(self, config_dict: Dict[str, Any]):
         """Update engine configuration in real-time."""
@@ -283,11 +320,12 @@ class ChatTTSEngine:
             if "max_delay" in config_dict:
                 self.max_delay = float(config_dict.get("max_delay", 2.0))
             if "auto_translate" in config_dict:
-                self.auto_translate = config_dict["auto_translate"] == "True"
+                self.auto_translate = str(config_dict["auto_translate"]) == "True"
             if "profanity_enabled" in config_dict:
-                self.profanity_enabled = config_dict["profanity_enabled"] == "True"
+                self.profanity_enabled = str(config_dict["profanity_enabled"]) == "True"
                 if self.profanity_enabled:
                     self._load_profanity_list()
             logger.info("Engine configuration updated in real-time.")
         except Exception as e:
             logger.error(f"Failed to update config in real-time: {e}")
+

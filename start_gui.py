@@ -229,6 +229,11 @@ class ChatTTSGui(ctk.CTk):
 
     def toggle_system(self):
         if not self.engine.is_running:
+            # Clear log box for new session
+            self.log_box.configure(state="normal")
+            self.log_box.delete("1.0", "end")
+            self.log_box.configure(state="disabled")
+            
             self.save_settings()
             conf = {
                 "yt_enabled": self.yt_enabled.get(),
@@ -244,12 +249,13 @@ class ChatTTSGui(ctk.CTk):
                 "profanity_enabled": self.profanity_enabled.get()
             }
             self.engine.start(conf)
-            self.btn_toggle.configure(text="Stop System", fg_color="red", hover_color="#8B0000")
+            self.btn_toggle.configure(text="STOP SYSTEM", fg_color="red", hover_color="#8B0000")
             self.label_status.configure(text="Status: Running", text_color="green")
         else:
             self.engine.stop()
-            self.btn_toggle.configure(text="Start System", fg_color="green", hover_color="#006400")
+            self.btn_toggle.configure(text="START SYSTEM", fg_color="green", hover_color="#006400")
             self.label_status.configure(text="Status: Stopped", text_color="red")
+
 
     def on_closing(self):
         self.engine.stop()
