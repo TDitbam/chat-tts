@@ -1,9 +1,21 @@
 import logging
 import os
+import sys
 from datetime import datetime
 
+def get_app_dir():
+    # ถ้าเป็น .exe ให้ใช้ AppData, ถ้าเป็น script ให้ใช้ที่เดิม
+    if getattr(sys, 'frozen', False):
+        app_dir = os.path.join(os.getenv('APPDATA'), 'ChatTTS')
+    else:
+        app_dir = os.getcwd()
+    
+    if not os.path.exists(app_dir):
+        os.makedirs(app_dir)
+    return app_dir
+
 # สร้างโฟลเดอร์ logs ถ้ายังไม่มี
-LOG_DIR = "logs"
+LOG_DIR = os.path.join(get_app_dir(), "logs")
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 

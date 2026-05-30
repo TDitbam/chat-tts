@@ -12,7 +12,7 @@ from deep_translator import GoogleTranslator
 from pygame import mixer
 from gtts import gTTS
 
-from .app_logger import get_logger
+from .app_logger import get_logger, get_app_dir
 from .collectors.yt_chat import youtube_collector
 from .collectors.twitch_chat import twitch_collector
 from .collectors.tiktok_chat import tiktok_collector
@@ -29,8 +29,12 @@ class ChatTTSEngine:
         self.max_seen_messages = 500
         self.threads = []
         
-        self.msg_dir = "msg_queue"
-        self.audio_dir = "temp_audio"
+        # ใช้ AppData แทนโฟลเดอร์ปัจจุบัน
+        app_dir = get_app_dir()
+        self.msg_dir = os.path.join(app_dir, "msg_queue")
+        self.audio_dir = os.path.join(app_dir, "temp_audio")
+        self.profanity_file = os.path.join(app_dir, "bad_words.txt")
+        
         self._ensure_directories()
         
         self.voice = "th-TH-PremwadeeNeural"
@@ -42,7 +46,6 @@ class ChatTTSEngine:
         # Profanity Filter
         self.profanity_enabled = False
         self.profanity_list = []
-        self.profanity_file = "bad_words.txt"
         self._load_profanity_list()
         
         self._init_mixer()

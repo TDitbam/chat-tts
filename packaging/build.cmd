@@ -18,9 +18,9 @@ if %errorlevel% neq 0 (
 echo.
 echo [2/5] Building Executables...
 echo Building GUI...
-python -m PyInstaller --onefile --name ChatTTS --clean --collect-all customtkinter --noconsole ..\start_gui.py
+python -m PyInstaller --onefile --name ChatTTS --clean --collect-all customtkinter --noconsole --uac-admin ..\start_gui.py
 echo Building CLI...
-python -m PyInstaller --onefile --name ChatTTS-CLI --clean ..\start_cli.py
+python -m PyInstaller --onefile --name ChatTTS-CLI --clean --uac-admin ..\start_cli.py
 
 if %errorlevel% neq 0 (
     echo [ERROR] Build failed.
@@ -41,13 +41,7 @@ if %errorlevel% neq 0 (
 :: 4. Build Installer (Inno Setup)
 echo.
 echo [4/5] Building Installer (Inno Setup)...
-set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
-if exist "!ISCC!" (
-    "!ISCC!" setup.iss
-) else (
-    echo [SKIP] Inno Setup compiler (ISCC.exe) not found in default path.
-    echo Please compile 'packaging\setup.iss' manually.
-)
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
 
 :: 5. Cleanup
 echo.

@@ -15,6 +15,7 @@ OutputBaseFilename=ChatTTS-v2.2.1-Setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+PrivilegesRequired=admin
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -24,12 +25,12 @@ Name: "thai"; MessagesFile: "compiler:Languages\Thai.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "dist\ChatTTS.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "dist\ChatTTS-CLI.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\docs\manual_th.md"; DestDir: "{app}\docs"; Flags: ignoreversion
-Source: "..\docs\ai_recommendations.md"; DestDir: "{app}\docs"; Flags: ignoreversion
+Source: "D:\chat-tts\packaging\dist\ChatTTS.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\chat-tts\packaging\dist\ChatTTS-CLI.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\chat-tts\README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\chat-tts\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\chat-tts\docs\manual_th.md"; DestDir: "{app}\docs"; Flags: ignoreversion
+Source: "D:\chat-tts\docs\ai_recommendations.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Chat TTS Multi-Platform"; Filename: "{app}\ChatTTS.exe"
